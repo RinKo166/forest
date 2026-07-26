@@ -185,8 +185,7 @@ body {
 }
 .modal-box {
   background: #252525; border: 2px solid #3a3a3a; ;
-  padding: 18px; min-width: 260px; pointer-events: auto;
-  
+  padding: 18px; min-width: 260px; max-width: 90vw; max-height: 90vh; overflow-y: auto; pointer-events: auto;
 }
 .modal-box .sub {
   font-size: 13px; color: #aaa; margin-bottom: 12px; line-height: 1.5;
@@ -296,7 +295,7 @@ body {
 
   <!-- 营地界面 -->
   <div class="screen" id="screenEquip">
-    <div style="display:flex;gap:16px;min-height:0;align-items:flex-start;">
+    <div style="display:flex;flex-wrap:wrap;gap:16px;min-height:0;align-items:flex-start;">
       <div style="display:flex;flex-direction:column;gap:12px;">
         <div class="stats-box" style="flex:none;">
           <div class="body-model" id="bodyModel"></div>
