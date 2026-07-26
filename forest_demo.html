@@ -1,0 +1,3838 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FOREST</title>
+<style>
+/* 手机强制横屏提示 */
+@media (orientation: portrait) and (max-width: 768px) {
+  #rotateTip { display: flex !important; }
+  .container { display: none !important; }
+}
+</style>
+<style>
+:root {
+  --cell-size: 50px;
+  --double-cell: calc(var(--cell-size) * 2);
+  --container-cols: 11;
+  --container-rows: 21;
+  --container-width: calc(var(--cell-size) * var(--container-cols));
+  --container-height: calc(var(--cell-size) * var(--container-rows));
+}
+@media (max-width: 1199px) { :root { --cell-size: 40px; } }
+@media (max-width: 767px) { :root { --cell-size: 30px; } }
+@media (max-width: 479px) { :root { --cell-size: 25px; } }
+* { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+body {
+  background: #1a1a1a;
+  color: #e0e0e0;
+  font-family: 'Segoe UI', sans-serif;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+.container {
+  max-width: 100%;
+  width: 100%;
+  height: 100vh;
+  background: #222;
+  display: flex; flex-direction: column;
+}
+.top-bar {
+  display: flex; align-items: center; gap: 20px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #3a3a3a;
+  flex-shrink: 0;
+}
+.top-bar h1 { font-size: 20px; color: #e94560; flex-shrink: 0; margin: 0; }
+
+/* 导航 */
+.nav-bar { display: flex; gap: 2px; flex-wrap: wrap; flex: 1; }
+.nav-btn {
+  padding: 6px 14px; background: transparent; border: none; color: #666;
+  cursor: pointer; font-size: 13px; font-weight: bold;
+  ;
+}
+.nav-btn:hover { color: #aaa; }
+.nav-btn.active { color: #e94560; border-bottom-color: #e94560; }
+.nav-btn.disabled { color: #444 !important; cursor: default !important; border-bottom-color: transparent !important; }
+.nav-btn.disabled:hover { color: #444 !important; }
+.sub-tab-bar { display:flex; gap:4px; margin-bottom:8px; flex-wrap:wrap; }
+.sub-tab { width:var(--double-cell); height:var(--double-cell); padding:0; background:transparent; border:2px solid #444; ; cursor:pointer; position:relative; overflow:hidden; }
+.sub-tab:hover { border-color:#888; background:rgba(255,255,255,0.05); }
+.sub-tab.active { border-color:#e94560; background:rgba(233,69,96,0.1); }
+.battle-log {
+  background: #111; border: 1px solid #333; ;
+  padding: 12px; min-height: 60px; overflow-y: auto;
+  font-size: 13px; line-height: 1.6; white-space: pre-wrap;
+  max-height: 50vh;
+}
+
+/* 界面容器 */
+.content-area {
+  flex: 1; overflow: hidden; border: 1px solid #3a3a3a; border-width: 0 1px 1px 1px;
+}
+.screen { display: none; height:100%; overflow-y:auto; padding: 16px; }
+.screen.active { display: block; }
+
+/* 装备界面 */
+.equip-layout { display: flex; gap: 16px; flex-wrap: wrap; }
+
+.stats-box {
+  flex: none;
+  background: #252525; ; padding: 14px;
+  border: 1px solid #3a3a3a;
+}
+.stats-box .st { display: flex; justify-content: space-between; padding: 4px 0; font-size: 14px; border-bottom: 1px solid #222; }
+.stats-box .st:last-child { border-bottom: none; }
+.stats-box .v { font-weight: bold; color: #fff; }
+
+.body-model {
+  display: grid;
+  grid-template-columns: var(--double-cell) var(--double-cell) var(--double-cell);
+  gap: 3px;
+  text-align: center;
+  justify-content: center;
+}
+.body-part {
+  cursor: default;
+  transition: background 0.2s;
+  width: var(--double-cell); height: var(--double-cell);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.body-part .bp-name { color: rgba(255,255,255,0.8); font-size: 11px; }
+.body-part .bp-hp { color: #fff; font-weight: bold; font-size: 14px; }
+.equip-box { flex: none; display: flex; flex-direction: column; align-items: center; background:#252525; border:1px solid #3a3a3a; ; padding:14px; }
+.equip-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-rows: auto auto auto auto;
+  gap: 5px;
+}
+.equip-slot {
+  background: #252525; border: 2px solid #3a3a3a;
+  padding: 6px; text-align: center;
+  width: var(--double-cell); height: var(--double-cell);
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  cursor: pointer; font-size: 12px;
+}
+.equip-slot:hover { border-color: #e94560; }
+.equip-slot.empty { border-style: solid; opacity: 0.5; }
+.equip-slot .sl { font-size: 10px; color: #666; }
+.equip-slot .nm { font-weight: bold; color: #fff; font-size: 12px; }
+.equip-slot .ex { font-size: 10px; color: #aaa; }
+.equip-slot.drag-equip-valid { border-color: #4ecca3; }
+
+/* .s-* grid positions generated from SLOT_DEFS at init */
+
+.ws-row { display:none; gap:5px; margin-top:5px; justify-content:center; flex-wrap:wrap; width:100%; }
+.ws-row .equip-slot { width:var(--double-cell); height:var(--double-cell); }
+
+.inv-box { flex: 1.5; min-width: 170px; background: #252525; ; padding: 14px; border: 1px solid #3a3a3a; }
+.inv-box h2 { font-size: 14px; color: #888; margin-bottom: 8px; text-align: center; }
+.stash-panel { background: #252525; ; padding: 14px; border: 1px solid #3a3a3a; }
+.inv-grid { display: grid; grid-template-columns: 1fr; gap: 0; }
+[data-drop="buybox"].drag-over { outline: 1px solid #4ecca3 !important; outline-offset: -1px; background: #1a3a2e !important; }
+.inv-item {
+  background: #222; border: 1px solid #333; ;
+  padding: 6px; text-align: center; cursor: pointer; font-size: 11px;
+}
+/* .grid-item hover removed */
+.inv-item .in { font-weight: bold; color: #fff; }
+.inv-item .is { color: #888; font-size: 10px; }
+.inv-empty { grid-column: 1/-1; text-align: center; color: #555; padding: 20px; }
+.inv-cell { width:var(--cell-size); height:var(--cell-size); box-sizing:border-box; background:#2a2a2a; }
+[data-drop="bag"].grid-item { ; border:none; min-width:0; padding:0; text-align:left; box-sizing:border-box; position:relative; z-index:0; }
+[data-drop^="bag"] { background:#2a2a2a; position:relative; }
+.l1 { display:block; }
+.l2 { display:block; }
+.l3 { z-index:0; } .l4 { z-index:1; } .l5 { z-index:2; }
+.l3 { z-index:0; } .l4 { z-index:1; } .l5 { z-index:2; }
+.l7 { display:flex; }
+.l8 { display:block; }
+.l9 { display:block; }
+.l10 { display:block; }
+.l11 { display:block; }
+.inv-cell.inv-blocked { cursor:default; }
+.inv-cell.drag-over, [data-drop="bag"].grid-item.drag-over { background:rgba(26,58,46,0.7) !important; outline:none !important; z-index:2; }
+.inv-cell.drag-over, [data-drop="bag"].grid-item.drag-over { background:rgba(26,58,46,0.7) !important; outline:none !important; z-index:2; }
+.inv-cell.drag-invalid, [data-drop="bag"].grid-item.drag-invalid { background:rgba(58,26,26,0.7) !important; outline:none !important; z-index:2; }
+.inv-cell.drag-invalid, [data-drop="bag"].grid-item.drag-invalid { background:rgba(58,26,26,0.7) !important; outline:none !important; z-index:2; }
+[data-overlay-for].drag-over { background: rgba(26,58,46,0.7) !important; outline: none !important; z-index: 2; }
+[data-overlay-for].drag-over { background: rgba(26,58,46,0.7) !important; outline: none !important; z-index: 2; }
+[data-overlay-for].drag-invalid { background: rgba(58,26,26,0.7) !important; outline: none !important; z-index: 2; }
+[data-overlay-for].drag-invalid { background: rgba(58,26,26,0.7) !important; outline: none !important; z-index: 2; }
+.equip-slot.drag-over { border-color: #4ecca3 !important; background: #1a3a2e !important; }
+.equip-slot.drag-over { border-color: #4ecca3 !important; background: #1a3a2e !important; }
+.equip-slot.drag-invalid { border-color: #e94560 !important; background: #3a1a1a !important; }
+.body-part.drag-over { outline: 2px solid #4ecca3 !important; outline-offset: -1px; background: #1a3a2e !important; }
+.body-part.drag-invalid { outline: 2px solid #e94560 !important; outline-offset: -1px; background: #3a1a1a !important; }
+[data-txt] {  }
+.inv-item-name-wrap { overflow: hidden; width: 100%; white-space: nowrap; text-overflow: ellipsis; text-align: left; }
+
+/* 弹窗 */
+.btn-pri { background:#3a5a4a; color:#e0e0e0; } .btn-pri:hover { background:#4a7a5a; } .btn-pri:active { background:#2a4a3a; }
+.btn-suc { background:#2a4a3a; color:#e0e0e0; } .btn-suc:hover { background:#3a6a4a; } .btn-suc:active { background:#1a3a2a; }
+.btn-del { background:#3a2a2a; color:#e06060; } .btn-del:hover { background:#5a3a3a; } .btn-del:active { background:#2a1a1a; }
+.modal-overlay {
+  display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  z-index: 1000;
+  pointer-events: none;
+}
+.modal-box {
+  background: #252525; border: 2px solid #3a3a3a; ;
+  padding: 18px; min-width: 260px; pointer-events: auto;
+  
+}
+.modal-box .sub {
+  font-size: 13px; color: #aaa; margin-bottom: 12px; line-height: 1.5;
+}
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  position: sticky; top: 0; z-index: 1;
+  background: #252525; padding-bottom: 8px; margin-bottom: 8px;
+}
+.mbtn {
+  display: block; width: 100%; padding: 10px; margin-bottom: 6px;
+  border: 1px solid #fff; ; background: #222; color: #fff;
+  font-size: 13px; cursor: pointer; font-family: inherit;
+}
+.mbtn:hover { border-color: #4ecca3; background: #353535; }
+.mbtn:last-child { margin-bottom: 0; }
+.mbtn-del { border-color: #e94560; color: #e94560; }
+
+@media (max-width: 700px) {
+  .equip-layout { flex-direction: column; }
+  .equip-grid { grid-template-columns: 1fr 1fr 1fr 1fr; }
+  .equip-slot { min-height: 48px; }
+}
+</style>
+<body>
+<div id="rotateTip" style="display:none;position:fixed;inset:0;z-index:99999;background:#1a1a1a;color:#888;flex-direction:column;align-items:center;justify-content:center;font-size:18px;gap:12px;">
+  <div style="font-size:48px;">↻</div>
+  <div>请横屏使用</div>
+</div>
+<div class="container">
+  <div class="top-bar">
+    <h1>FOREST</h1>
+    <div class="nav-bar">
+      <button class="nav-btn active" id="navDungeon" onclick="showScreen('dungeon')">远征</button>
+      <button class="nav-btn" id="navEquip" onclick="showScreen('equip')">角色</button>
+      <button class="nav-btn" id="navCamp" onclick="showScreen('camp')">营地</button>
+      <button class="nav-btn" id="navSkill" onclick="showScreen('skill')">技能</button>
+      <button class="nav-btn" id="navTrader" onclick="showScreen('trader')">商人</button>
+      <button class="nav-btn" id="navStats" onclick="showScreen('stats')">航海日志</button>
+      <button class="nav-btn" id="navSave" onclick="showScreen('save')">存档</button>
+    </div>
+  </div>
+  <div class="content-area">
+
+  <!-- 远征界面 -->
+  <div class="screen active" id="screenDungeon">
+    <div id="mapSelect" style="text-align:center;padding:10px;">
+      <div style="font-size:16px;color:#e94560;font-weight:bold;margin-bottom:12px;">选择地图</div>
+      <div id="mapList"></div>
+    </div>
+    <div id="expeditionView" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <span class="title" id="dTitle" style="font-size:16px;">远征</span>
+        <span style="font-size:14px;">行动时间：<span id="actionTimeDisplay" style="color:#4ecca3;font-weight:bold;">100</span></span>
+      </div>
+      <!-- 上排：地图左 + 事件右 -->
+      <div style="display:flex;gap:10px;min-height:0;">
+        <div style="flex:1;min-width:0;">
+          <div style="text-align:left;font-size:11px;color:#888;margin-bottom:4px;" id="coordDisplay">当前位置：A1</div>
+          <div id="roomGrid" style="overflow:auto;max-height:60vh;"></div>
+        </div>
+        <div style="width:260px;flex-shrink:0;display:flex;flex-direction:column;">
+          <div class="desc" id="dDesc" style="margin-bottom:6px;"></div>
+          <div class="battle-log" id="dLog" style="flex:1;"></div>
+          <div class="choices" id="dChoices" style="margin-top:6px;"></div>
+        </div>
+      </div>
+      <!-- 远征页装备同步 -->
+      <div style="border-top:2px solid #3a3a3a;margin-top:12px;padding-top:10px;">
+        <div style="font-size:14px;color:#888;text-align:center;margin-bottom:10px;">── 装备 ──</div>
+        <div class="equip-layout">
+          <div class="stats-box">
+            <div class="body-model" id="exBodyModel"></div>
+          </div>
+          <div class="equip-box">
+            <div class="equip-grid">
+              <div class="equip-slot s-head empty" data-drop="equip" data-slot="head" onclick="showEquipModal('head')"><span class="sl">头</span><span class="nm" id="exEqHead">空</span></div>
+              <div class="equip-slot s-sling empty" data-drop="equip" data-slot="sling" onclick="showEquipModal('sling')"><span class="sl">背带</span><span class="nm" id="exEqSling">空</span></div>
+              <div class="equip-slot s-mask empty" data-drop="equip" data-slot="mask" onclick="showEquipModal('mask')"><span class="sl">面具</span><span class="nm" id="exEqMask">空</span></div>
+              <div class="equip-slot s-arms empty" data-drop="equip" data-slot="arms" onclick="showEquipModal('arms')"><span class="sl">手臂</span><span class="nm" id="exEqArms">空</span></div>
+              <div class="equip-slot s-safe empty" data-drop="equip" data-slot="safe" onclick="showEquipModal('safe')"><span class="sl">保险箱</span><span class="nm" id="exEqSafe">空</span></div>
+              <div class="equip-slot s-chest empty" data-drop="equip" data-slot="chest" onclick="showEquipModal('chest')"><span class="sl">胸</span><span class="nm" id="exEqChest">空</span></div>
+              <div class="equip-slot s-clothes empty" data-drop="equip" data-slot="clothes" onclick="showEquipModal('clothes')"><span class="sl">衣服</span><span class="nm" id="exEqClothes">空</span></div>
+              <div class="equip-slot s-legs empty" data-drop="equip" data-slot="legs" onclick="showEquipModal('legs')"><span class="sl">腿</span><span class="nm" id="exEqLegs">空</span></div>
+              <div class="equip-slot s-pants empty" data-drop="equip" data-slot="pants" onclick="showEquipModal('pants')"><span class="sl">裤子</span><span class="nm" id="exEqPants">空</span></div>
+              <div class="equip-slot s-pack empty" data-drop="equip" data-slot="pack" onclick="showEquipModal('pack')"><span class="sl">背包</span><span class="nm" id="exEqPack">空</span></div>
+              <div class="equip-slot s-chest-pack empty" data-drop="equip" data-slot="chest_pack" onclick="showEquipModal('chest_pack')"><span class="sl">胸包</span><span class="nm" id="exEqChestPack">空</span></div>
+              <div class="equip-slot s-waist-pouch empty" data-drop="equip" data-slot="waist_pouch" onclick="showEquipModal('waist_pouch')"><span class="sl">腰包</span><span class="nm" id="exEqWaistPouch">空</span></div>
+            </div>
+            <div class="ws-row" id="exWeaponSlotsRow"></div>
+            <div class="ws-row" id="exSidearmSlotsRow"></div>
+            <div class="actions">
+              <button class="btn btn-pri" onclick="showItemOverview()">物品总览</button>
+              <button class="btn btn-sec" onclick="damageAllLimbs(10)" style="margin-left:6px;">测试伤害</button>
+            </div>
+            <div class="msg info" id="exEquipMsg"></div>
+          </div>
+          <div class="inv-box">
+            <div class="inv-grid" id="exInvGrid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 营地界面 -->
+  <div class="screen" id="screenEquip">
+    <div style="display:flex;gap:16px;min-height:0;align-items:flex-start;">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="stats-box" style="flex:none;">
+          <div class="body-model" id="bodyModel"></div>
+        </div>
+        <div class="equip-box" style="flex:none;">
+          <div class="equip-grid">
+            <div class="equip-slot s-head empty" data-drop="equip" data-slot="head" onclick="showEquipModal('head')"><span class="sl">头</span><span class="nm" id="eqHead">空</span></div>
+            <div class="equip-slot s-sling empty" data-drop="equip" data-slot="sling" onclick="showEquipModal('sling')"><span class="sl">背带</span><span class="nm" id="eqSling">空</span></div>
+            <div class="equip-slot s-mask empty" data-drop="equip" data-slot="mask" onclick="showEquipModal('mask')"><span class="sl">面具</span><span class="nm" id="eqMask">空</span></div>
+            <div class="equip-slot s-arms empty" data-drop="equip" data-slot="arms" onclick="showEquipModal('arms')"><span class="sl">手臂</span><span class="nm" id="eqArms">空</span></div>
+            <div class="equip-slot s-safe empty" data-drop="equip" data-slot="safe" onclick="showEquipModal('safe')"><span class="sl">保险箱</span><span class="nm" id="eqSafe">空</span></div>
+            <div class="equip-slot s-chest empty" data-drop="equip" data-slot="chest" onclick="showEquipModal('chest')"><span class="sl">胸</span><span class="nm" id="eqChest">空</span></div>
+            <div class="equip-slot s-clothes empty" data-drop="equip" data-slot="clothes" onclick="showEquipModal('clothes')"><span class="sl">衣服</span><span class="nm" id="eqClothes">空</span></div>
+            <div class="equip-slot s-legs empty" data-drop="equip" data-slot="legs" onclick="showEquipModal('legs')"><span class="sl">腿</span><span class="nm" id="eqLegs">空</span></div>
+            <div class="equip-slot s-pants empty" data-drop="equip" data-slot="pants" onclick="showEquipModal('pants')"><span class="sl">裤子</span><span class="nm" id="eqPants">空</span></div>
+            <div class="equip-slot s-pack empty" data-drop="equip" data-slot="pack" onclick="showEquipModal('pack')"><span class="sl">背包</span><span class="nm" id="eqPack">空</span></div>
+            <div class="equip-slot s-chest-pack empty" data-drop="equip" data-slot="chest_pack" onclick="showEquipModal('chest_pack')"><span class="sl">胸包</span><span class="nm" id="eqChestPack">空</span></div>
+            <div class="equip-slot s-waist-pouch empty" data-drop="equip" data-slot="waist_pouch" onclick="showEquipModal('waist_pouch')"><span class="sl">腰包</span><span class="nm" id="eqWaistPouch">空</span></div>
+          </div>
+          <div class="ws-row" id="weaponSlotsRow"></div>
+          <div class="ws-row" id="sidearmSlotsRow"></div>
+          <div class="actions">
+            <button class="btn btn-pri" onclick="showItemOverview()">物品总览</button>
+            <button class="btn btn-sec" onclick="damageAllLimbs(10)" style="margin-left:6px;">测试伤害</button>
+          </div>
+          <div class="msg info" id="equipMsg"></div>
+        </div>
+      </div>
+      <div class="inv-box" style="width:var(--container-width);height:var(--container-height);flex:none;overflow-y:auto;">
+        <div class="inv-grid" id="invGrid"></div>
+      </div>
+      <div class="stash-panel" style="width:var(--container-width);height:var(--container-height);flex:none;overflow-y:auto;">
+        <div class="inv-grid" id="stashGrid" style="grid-template-columns:repeat(10,var(--cell-size));gap:0;;"></div>
+              </div>
+    </div>
+  </div>
+  <!-- 统计界面 -->
+  <div class="screen" id="screenStats">
+    <div class="stats-box-big">
+      <div class="l">航海日志</div>
+      <div class="d">
+        <div>最深远征：第 <span id="stFloor" style="color:#fff;">1</span> 次</div>
+        <div>击退敌人：<span id="stKills" style="color:#fff;">0</span></div>
+        <div>累计掠夺：<span id="stGoldAll" style="color:#fff;">0</span></div>
+        <div>阵亡次数：<span id="stDeaths" style="color:#e94560;">0</span></div>
+      </div>
+      <div style="margin-top:20px;text-align:left;">
+        <div class="l" style="font-size:14px;">敌人图鉴</div>
+        <div id="bestiaryList" style="margin-top:8px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 营地界面 -->
+  <div class="screen" id="screenCamp">
+    <div style="padding:16px;">
+      <div class="l" style="margin-bottom:8px;">营地设施</div>
+      <div class="equip-slot s-stash empty" id="campStashSlot" data-drop="equip" data-slot="camp_stash" onclick="showEquipModal('camp_stash')" style="width:var(--double-cell,100px);height:var(--double-cell,100px);">
+        <span class="sl">设施</span>
+        <span class="nm" id="eqCampStash">空</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 技能界面 -->
+  <div class="screen" id="screenSkill">
+    <div class="stats-box-big">
+      <div class="l">技能</div>
+      <div class="d" id="skillList">
+        <div style="color:#666;font-size:13px;">暂无技能</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 商人界面 -->
+  <div class="screen" id="screenTrader">
+    <div style="padding:10px;">
+      <div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;" id="merchantTabBar"></div>
+      <div style="display:flex;gap:12px;justify-content:flex-start;">
+        <!-- 左：商人货物网格 -->
+        <div style="width:var(--container-width);height:var(--container-height);flex:none;overflow-y:auto;background:#252525;border:1px solid #3a3a3a;">
+          <div style="padding:10px;">
+            <div style="font-size:14px;font-weight:bold;margin-bottom:6px;"><span id="merchantName">船医</span></div>
+            <div class="inv-grid" id="merchantGrid" style="grid-template-columns:repeat(10,var(--cell-size));gap:0;max-height:calc(40 * CELL_SIZE);;"></div>
+          </div>
+        </div>
+        <!-- 中：置换框 -->
+        <div style="flex:none;align-self:center;">
+          <div style="background:#252525;;padding:12px;border:1px solid #3a3a3a;">
+            <div style="font-size:12px;color:#888;text-align:center;margin-bottom:4px;">将换入的物品</div>
+            <div class="inv-grid" id="tradeBuyGrid" data-drop="buybox" style="grid-template-columns:repeat(10,var(--cell-size));grid-template-rows:repeat(10,var(--cell-size));gap:0;justify-content:center;;"></div>
+            <div style="font-size:12px;color:#888;text-align:center;margin:8px 0 4px;">将换出的物品</div>
+            <div class="inv-grid" id="tradePayGrid" style="grid-template-columns:repeat(10,var(--cell-size));grid-template-rows:repeat(10,var(--cell-size));gap:0;justify-content:center;;"></div>
+            <div id="tradeWarning" style="font-size:12px;color:#ff6b6b;text-align:center;margin:8px 0;min-height:18px;visibility:hidden;"></div>
+            <div style="display:flex;gap:6px;margin-top:4px;justify-content:center;">
+              <button class="mbtn mbtn-suc" id="tradeConfirmBtn" onclick="confirmTrade()" style="font-size:12px;padding:4px 12px;">置换</button>
+              <button class="mbtn" onclick="cancelTrade()" style="font-size:12px;padding:4px 12px;">取消</button>
+            </div>
+          </div>
+        </div>
+        <!-- 右：储藏箱 -->
+        <div class="stash-panel" style="width:var(--container-width);height:var(--container-height);flex:none;overflow-y:auto;">
+          <div style="text-align:center;font-size:12px;color:#aaa;margin-bottom:4px;" id="stashCoinCount"></div>
+          <div class="inv-grid" id="traderStashGrid" style="grid-template-columns:repeat(10,var(--cell-size));gap:0;;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 存档界面 -->
+  <div class="screen" id="screenSave">
+    <div style="display:flex;gap:16px;">
+      <div class="stats-box-big" style="flex:none;width:240px;">
+        <div class="l">存档</div>
+        <div class="d">
+          <button class="btn btn-pri" id="saveBtn" onclick="toggleSaveMode()" style="display:block;margin-bottom:8px;width:100%;padding:12px 0;font-size:16px;border:none;cursor:pointer;">保存游戏</button>
+          <button class="btn btn-suc" onclick="doLoad()" style="display:block;margin-bottom:8px;width:100%;padding:12px 0;font-size:16px;border:none;cursor:pointer;">读取存档</button>
+          <button class="btn btn-del" onclick="doDelete()" style="display:block;margin-bottom:8px;width:100%;padding:12px 0;font-size:16px;border:none;cursor:pointer;">删除存档</button>
+          <div id="saveInfo" class="msg info" style="margin-top:8px;font-size:11px;"></div>
+        </div>
+      </div>
+      <div id="saveSlots" style="flex:1;display:flex;flex-direction:column;gap:4px;"></div>
+    </div>
+  </div>
+
+</div>
+
+  <!-- 物品菜单 -->
+  <div class="modal-overlay" id="itemModal">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="modalTitle" style="margin:0;font-size:16px;font-weight:bold;color:#fff;"></h3>
+        <button onclick="closeModal()" style="background:none;border:none;color:#888;cursor:pointer;font-size:16px;line-height:1;">✕</button>
+      </div>
+      <button class="mbtn mbtn-pri" onclick="itemDetail()">详细信息</button>
+      <button class="mbtn mbtn-suc" id="modalActionBtn" onclick="itemAction()">装备</button>
+      <button class="mbtn mbtn-open" id="modalOpenBtn" onclick="itemOpen()" style="display:none;">打开</button>
+      <button class="mbtn mbtn-split" id="modalSplitBtn" onclick="itemSplit()" style="display:none;">拆分</button>
+<button class="mbtn mbtn-del" id="modalDestroyBtn" onclick="itemDestroy()">销毁</button>
+      <button class="mbtn mbtn-tr" id="modalTransfer" onclick="itemTransfer()" style="display:none;">转入 储藏箱</button>
+    </div>
+  </div>
+
+  <!-- 物品总览 -->
+  <div class="modal-overlay" id="itemOverviewModal">
+    <div class="modal-box" style="max-width:500px;max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 style="margin:0;font-size:16px;font-weight:bold;color:#fff;">物品总览</h3>
+        <button onclick="closeOverviewModal()" style="background:none;border:none;color:#888;cursor:pointer;font-size:16px;line-height:1;">✕</button>
+      </div>
+      <div id="overviewContent"></div>
+    </div>
+  </div>
+
+  <!-- 确认弹窗 -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-box" onclick="event.stopPropagation()" style="text-align:center;">
+      <div class="modal-header">
+        <h3 style="margin:0;font-size:16px;font-weight:bold;color:#fff;">提示</h3>
+      </div>
+      <div class="sub" id="confirmText" style="font-size:14px;color:#e0e0e0;"></div>
+      <button class="mbtn mbtn-suc" id="confirmOkBtn" style="margin-bottom:6px;">确定</button>
+      <button class="mbtn" id="confirmDelBtn" style="display:none;margin-bottom:6px;background:#5c1a1a;color:#e94560;">删除存档</button>
+      <button class="mbtn" onclick="closeConfirmModal();">取消</button>
+    </div>
+  </div>
+
+  <!-- 取出数量选择 -->
+  <div class="modal-overlay" id="qtyModal">
+    <div class="modal-box" style="max-width:360px;" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 style="margin:0;font-size:16px;font-weight:bold;color:#fff;">取出物品</h3>
+        <button onclick="closeQtyModal()" style="background:none;border:none;color:#888;cursor:pointer;font-size:16px;line-height:1;">✕</button>
+      </div>
+      <div style="padding:12px 0;">
+        <div id="qtyItemInfo" style="font-size:14px;color:#fff;margin-bottom:12px;text-align:center;"></div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <input type="range" id="qtySlider" min="1" max="1" value="1" oninput="syncQtyInput()" style="flex:1;accent-color:#e94560;">
+          <input type="number" id="qtyInput" min="1" max="1" value="1" oninput="syncQtySlider()" style="width:60px;padding:4px;;border:1px solid #444;background:#1a1a1a;color:#fff;text-align:center;font-size:14px;">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:center;">
+        <button class="mbtn mbtn-suc" onclick="confirmTakeout()">取出</button>
+        <button class="mbtn" onclick="closeQtyModal()">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 物品详情浮窗 -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal-box" onclick="event.stopPropagation()" style="max-width:350px;">
+      <div class="modal-header">
+        <h3 id="detailTitle" style="margin:0;font-size:15px;font-weight:bold;color:#fff;"></h3>
+        <button onclick="closeDetailModal()" style="background:none;border:none;color:#888;cursor:pointer;font-size:16px;line-height:1;">✕</button>
+      </div>
+      <div id="detailIconWrap" style="text-align:center;margin:8px 0;">
+        <div id="detailIcon" style="width:90px;height:90px;margin:0 auto;background-size:contain;background-repeat:no-repeat;background-position:center;image-rendering:pixelated;image-rendering:-moz-crisp-edges;display:none;"></div>
+      </div>
+      <div id="detailContent" style="font-size:12px;color:#ccc;line-height:1.6;"></div>
+    </div>
+  </div>
+
+</div>
+
+
+<script>
+// 网格尺寸常量（响应式）
+var CELL_SIZE = 50, HALF_CELL = 25;
+function getCellSize() {
+  var w = window.innerWidth;
+  if (w >= 1200) return 50;
+  if (w >= 768) return 40;
+  if (w >= 480) return 30;
+  return 25;
+}
+function syncCellSize() {
+  var s = getCellSize();
+  if (s === CELL_SIZE) return;
+  CELL_SIZE = s;
+  HALF_CELL = s / 2;
+  document.documentElement.style.setProperty('--cell-size', s + 'px');
+  renderAll();
+}
+
+// 游戏数据
+const G = {
+  floor: 1, kills: 0, totalGold: 0, deaths: 0,
+  hp: 100, maxHp: 100,
+  baseAtk: 5, baseDef: 3, baseSpd: 5,
+  limbs: {
+    head: { hp: 50, max: 50 },
+    chest: { hp: 70, max: 70 },
+    abdomen: { hp: 70, max: 70 },
+    leftHand: { hp: 50, max: 50 },
+    rightHand: { hp: 50, max: 50 },
+    leftLeg: { hp: 50, max: 50 },
+    rightLeg: { hp: 50, max: 50 }
+  },
+  equipped: {},
+  weaponSlots: [],
+  sidearmSlots: [],
+  skills: {},
+  _nextId: 1000,
+  _containerSpaces: {
+    stash: { w: 10, h: 40, connected: true, grid: function(){var g=[];for(var r=0;r<40;r++){g[r]=[];for(var c=0;c<10;c++)g[r][c]=null;}return g;}(), _spaceUid: 'sp_stash', _itemUid: 'itm_stash', _label: '储藏箱', _noLose: true },
+  },
+};
+
+// ===== 容器 API（统一格子操作入口） =====
+const C = {
+  _d: G._containerSpaces,
+  STASH: 'stash',
+  bagOrder: ['chest_pack','clothes','legs','waist_pouch','pack','safe'],
+
+  exists(id) { return !!this._d[id]; },
+  get(id) { return this._d[id] || null; },
+  grid(id) { var s = this._d[id]; return s ? s.grid : null; },
+  getCell(id, r, c) { var g = this.grid(id); return g && g[r] ? g[r][c] : null; },
+  setCell(id, r, c, v) { if (this._d[id] && this._d[id].grid[r]) this._d[id].grid[r][c] = v; },
+  clearCell(id, r, c) { this.setCell(id, r, c, null); },
+  isEmpty(id, r, c) { return this.getCell(id, r, c) == null; },
+  rows(id) { var g = this.grid(id); return g ? g.length : 0; },
+  cols(id) { var g = this.grid(id); return g && g[0] ? g[0].length : 0; },
+  w(id) { var s = this._d[id]; return s ? s.w : 0; },
+  h(id) { var s = this._d[id]; return s ? s.h : 0; },
+  connected(id) { var s = this._d[id]; return s ? s.connected !== false : true; },
+  cellGroup(id) { var s = this._d[id]; return s ? s.cellGroup : null; },
+  getBanTags(id) { var s = this._d[id]; return s ? s._banTags : null; },
+  cloneSpace(oldId, newId) { if (this._d[oldId]) this._d[newId] = this._d[oldId]; },
+  assign(id, val) { this._d[id] = val; },
+  delete(id) { delete this._d[id]; },
+
+  each(fn) { for (var k in this._d) { fn(k, this._d[k]); } },
+
+  // 网格遍历：对区域内每个格子执行 fn
+  eachCell(id, r0, c0, h, w, fn) {
+    for (var r = r0; r < r0 + h; r++)
+      for (var c = c0; c < c0 + w; c++)
+        fn(r, c, this.getCell(id, r, c));
+  },
+
+  // 放置物品到格子（不处理容器初始化，仅填格）
+  _occupy(id, item, row, col) {
+    var sz = getItemSize(item);
+    for (var r = 0; r < sz.h; r++)
+      for (var c = 0; c < sz.w; c++)
+        this.setCell(id, row + r, col + c, item);
+  },
+
+  // 从格子擦除物品
+  _vacate(id, row, col) {
+    var item = this.getCell(id, row, col);
+    if (!item) return null;
+    var sz = getItemSize(item);
+    for (var r = 0; r < sz.h; r++)
+      for (var c = 0; c < sz.w; c++)
+        if (row + r >= 0 && col + c >= 0)
+          this.clearCell(id, row + r, col + c);
+    return item;
+  },
+
+  // 容器级写操作
+  setBanTags(id, tags) { if (this._d[id]) this._d[id]._banTags = tags; },
+  copy(fromId, toId) { if (this._d[fromId]) this._d[toId] = this._d[fromId]; },
+};
+
+// ===== 装备 API =====
+const E = {
+  _d: G.equipped,
+  weapon: G.weaponSlots,
+  sidearm: G.sidearmSlots,
+  get(slot) { return this._d[slot]; },
+  set(slot, item) { this._d[slot] = item; },
+  clear(slot) { this._d[slot] = null; },
+  each(fn) { for (var s in this._d) fn(s, this._d[s]); },
+  reset() { this._d = G.equipped = {}; },
+  clearWeapons() { this.weapon.length = 0; this.sidearm.length = 0; },
+  clearWeapon() { this.weapon.length = 0; },
+  clearSidearm() { this.sidearm.length = 0; },
+};
+
+// 物品数据（用唯一ID关联，不用引用比较）
+const ITEMS = [
+  { id: 'pk2', name: '伊比利亚航海置物皮包', x: 3, y: 3, cx: 5, cy: 3, _cellGroup: [[null,'B','B','B',null],['A','B','B','B','C'],['A','B','B','B','C']], tags: ['背包', '容器', '可装备'] },
+  { id: 'pk3', name: '水手帆布挎包', x: 2, y: 2, cx: 2, cy: 3, tags: ['背包', '容器', '可装备'] },
+  { id: 'coin_gold', name: '金币', stack: 1000, tags: ['可堆叠', '货币'] },
+  { id: 'coin_silver', name: '银币', stack: 1000, tags: ['可堆叠', '货币'] },
+  { id: 'blood_bag_s', name: '兽皮注射器', x: 1, y: 1, durability: 100, heal: 30, tags: ['医用品', '消耗品'] },
+  { id: 'rusty_knife', name: '生锈水手短匕', x: 1, y: 2, tags: ['武器', '短刀', '单手', '可装备'] },
+  { id: 'broken_chest', name: '破损轻骑兵胸甲', x: 3, y: 3, durability: 30, tags: ['护甲', '胸甲', '耐久物品', '可装备'] },
+  { id: 'jewelry_safe', name: '首饰保险盒', x: 2, y: 2, cx: 2, cy: 2, tags: ['保险箱', '容器', '可装备'] },
+  { id: 'cloth_coarse', name: '粗布上衣', x: 3, y: 3, cx: 2, cy: 1, connected: false, tags: ['上衣', '容器', '可装备'] },
+  { id: 'stash_default', name: '10x40储藏箱', cx: 10, cy: 40, tags: ['储藏箱', '容器'] },
+  { id: 'x6y7', name: 'X6Y7', x: 6, y: 7, tags: ['测试'] },
+  { id: 'x4y4', name: 'X4Y4', x: 4, y: 4, tags: ['测试'] },
+  { id: 'x5', name: 'X5', x: 5, y: 5, tags: ['测试'] },
+];
+
+
+// === 物品像素图标系统 ===
+// 商人头像使用 100×100，物品图标使用 48×48（d 字段的行数决定分辨率）
+
+
+
+// 获取物品尺寸
+function getItemSize(item) {
+  if (!item) return { w: 1, h: 1 };
+  if (item.x != null && item.y != null) return { w: item.x, h: item.y };
+  if (item.size) return { w: item.size.w || 1, h: item.size.h || 1 };
+  return { w: 1, h: 1 };
+}
+
+// 查找物品的类型
+function hasTag(item, tag) {
+  return item && item.tags && item.tags.indexOf(tag) !== -1;
+}
+
+// 查找物品的最大耐久（从模板读取）
+function getItemMaxDurability(item) {
+  if (!item || !item.id) return null;
+  if (item._maxDur != null) return item._maxDur;
+  for (var _i = 0; _i < ITEMS.length; _i++) {
+    if (ITEMS[_i].id === item.id && ITEMS[_i].durability != null) {
+      item._maxDur = ITEMS[_i].durability;
+      return item._maxDur;
+    }
+  }
+    return null;
+}
+
+// 计算属性
+
+// 找空槽位
+// 装备槽单一数据源
+// 增删装备槽只需改此数组，findSlot / isValidEquip / renderEquip / CSS / getBagUnlocked 自动同步
+// ===== 装备系统 =====
+var SLOT_DEFS = [
+  { key:'head',       label:'头',     tag:'头盔',   el:'eqHead',         exEl:'exEqHead',         cls:'s-head',       row:1, col:2, bagUnlock:null },
+  { key:'sling',      label:'背带',   tag:'背带',   el:'eqSling',        exEl:'exEqSling',        cls:'s-sling',      row:1, col:3, bagUnlock:null, _protected:true },
+  { key:'mask',       label:'面具',   tag:'面具',   el:'eqMask',         exEl:'exEqMask',         cls:'s-mask',       row:1, col:1, bagUnlock:null },
+  { key:'arms',       label:'手臂',   tag:'臂甲',   el:'eqArms',         exEl:'exEqArms',         cls:'s-arms',       row:2, col:1, bagUnlock:null },
+  { key:'safe',       label:'保险箱', tag:'保险箱', el:'eqSafe',         exEl:'exEqSafe',         cls:'s-safe',       row:4, col:1, bagUnlock:'safe', _protected:true },
+  { key:'chest',      label:'胸',     tag:'胸甲',   el:'eqChest',        exEl:'exEqChest',        cls:'s-chest',      row:2, col:2, bagUnlock:null },
+  { key:'clothes',    label:'衣服',   tag:'上衣',   el:'eqClothes',      exEl:'exEqClothes',      cls:'s-clothes',    row:2, col:3, bagUnlock:null, _protected:true },
+  { key:'legs',       label:'腿',     tag:'腿甲',   el:'eqLegs',         exEl:'exEqLegs',         cls:'s-legs',       row:4, col:2, bagUnlock:null, _protected:true },
+  { key:'pants',      label:'裤子',   tag:'裤子',   el:'eqPants',        exEl:'exEqPants',        cls:'s-pants',      row:4, col:3, bagUnlock:null },
+  { key:'pack',       label:'背包',   tag:'背包',   el:'eqPack',         exEl:'exEqPack',         cls:'s-pack',       row:2, col:4, bagUnlock:'backpack' },
+  { key:'chest_pack', label:'胸包',   tag:'胸包',   el:'eqChestPack',    exEl:'exEqChestPack',    cls:'s-chest-pack', row:1, col:4, bagUnlock:'satchel' },
+  { key:'waist_pouch',label:'腰包',   tag:'腰包',   el:'eqWaistPouch',   exEl:'exEqWaistPouch',   cls:'s-waist-pouch',row:4, col:4, bagUnlock:'waist' },
+  { key:'camp_stash', label:'营地设施', tag:'储藏箱', el:'eqCampStash',    exEl:null,                cls:'s-camp-stash',  row:1, col:1, bagUnlock:null },
+];
+
+// 生成装备栏 grid CSS 规则
+(function() {
+  var css = '';
+  for (var i = 0; i < SLOT_DEFS.length; i++) {
+    var d = SLOT_DEFS[i];
+    css += '.' + d.cls + ' { grid-column: ' + d.col + '; grid-row: ' + d.row + '; }\n';
+  }
+  var style = document.createElement('style');
+  style.id = 'slotGridStyle';
+  style.textContent = css;
+  document.head.appendChild(style);
+})();
+
+function findSlot(item) {
+  if (!item) return null;
+  // 武器/单手是动态多槽，特殊处理
+  if (hasTag(item, '武器') && hasTag(item, '可装备')) {
+    var i = E.weapon.indexOf(null);
+    return i >= 0 ? 'wslot_'+i : null;
+  }
+  if (hasTag(item, '单手') && hasTag(item, '可装备')) {
+    var i = E.sidearm.indexOf(null);
+    return i >= 0 ? 'sslot_'+i : null;
+  }
+  // 常规槽位遍历 SLOT_DEFS
+  for (var i = 0; i < SLOT_DEFS.length; i++) {
+    if (hasTag(item, SLOT_DEFS[i].tag) && hasTag(item, '可装备')) return SLOT_DEFS[i].key;
+  }
+  return null;
+}
+
+function renderEquip() {
+  for (var i = 0; i < SLOT_DEFS.length; i++) {
+    var d = SLOT_DEFS[i];
+    var item = E.get(d.key);
+    renderEquipSlot(d.el, d.key, item);
+    renderEquipSlot(d.exEl, d.key, item);
+  }
+}
+
+function renderEquipSlot(elId, slot, item) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const parent = el.parentElement;
+  if (item) {
+    el.textContent = item.name;
+    parent.classList.remove('empty');
+    parent.setAttribute('draggable', 'true');
+    parent.setAttribute('data-drag', JSON.stringify({src:'equipped', slot: slot}));
+    parent.setAttribute('style', 'background-image:url(\'' + _getItemIconUrl(item.id) + '\');background-size:contain;background-repeat:no-repeat;background-position:center;image-rendering:pixelated;');
+    let ex = parent.querySelector('.ex');
+    if (!ex) { ex = document.createElement('span'); ex.className = 'ex'; parent.appendChild(ex); }
+    ex.textContent = ['atk','def','spd'].filter(k => item[k]).map(k => ({atk:'攻+',def:'防+',spd:'速'})[k] + item[k]).join(' ');
+  } else {
+    el.textContent = '空';
+    parent.classList.add('empty');
+    parent.removeAttribute('draggable');
+    parent.removeAttribute('data-drag');
+    parent.removeAttribute('style');
+    const ex = parent.querySelector('.ex');
+    if (ex) ex.remove();
+  }
+}
+
+// 渲染背包（4种袋，网格系统）
+function renderInventory() {
+  renderInvGrid('invGrid');
+  renderInvGrid('exInvGrid');
+}
+
+function getBagUnlocked(bag) {
+  for (var i = 0; i < SLOT_DEFS.length; i++) {
+    if (SLOT_DEFS[i].bagUnlock === bag) return !!E.get(SLOT_DEFS[i].key);
+  }
+  return true;
+}
+
+function isCellEmpty(bag, row, col) {
+  var g = C.grid(bag);
+  if (!g) return false;
+  if (row < 0 || row >= g.length || col < 0 || col >= g[0].length) return false;
+  return g[row][col] === null;
+}
+
+function getCellGroup(bag, row, col) {
+  var cg = C.cellGroup(bag);
+  if (cg && cg[row] !== undefined) return cg[row][col];
+  return true;
+}
+
+// 将边框 CSS 字符串包裹为内层 div
+// ===== 网格覆盖层 l1-l5 =====
+function _layer(cls, css) { return '<div class="'+cls+'" style="position:absolute;inset:0;pointer-events:none;'+css+'"></div>'; }
+// 第 1 层：格子背景
+function _l1() { return _layer("l1", "background:rgba(60,60,60,0.3);"); }
+// 第 2 层：死格背景
+function _l2(blocked) { return blocked ? _layer("l2", "background:#0a0a0a;") : ""; }
+
+// 第 3 层：统一浅灰网格线 1px（每格 right+bottom，首行 top，首列 left）
+function _l3(r, c) {
+  var s = 'border-right:1px solid #555;border-bottom:1px solid #555;';
+  if (r === 0) s += 'border-top:1px solid #555;';
+  if (c === 0) s += 'border-left:1px solid #555;';
+  return _layer("l3", s);
+}
+// 第 4 层：不连通边界深黑 2px（cellGroup 不同或 null）
+function _l4(bg, r, c, h, w, cg) {
+  var bi = cellBorderInfo(bg, r, c, h, w, cg);
+  var s = '';
+  if (bi.rightPx === '2px' && bi.rightColor === '#000') s += 'border-right:2px solid #000;';
+  if (bi.bottomPx === '2px' && bi.bottomColor === '#000') s += 'border-bottom:2px solid #000;';
+  if (bi.topPx === '2px' && bi.topColor === '#000' && r > 0) s += 'border-top:2px solid #000;';
+  if (bi.leftPx === '2px' && bi.leftColor === '#000' && c > 0) s += 'border-left:2px solid #000;';
+  return s ? _layer("l4", s) : "";
+}
+// 第 5 层：空间外框深黑 2px（bag 的最外层边缘）
+function _l5(r, c, h, w) {
+  var s = '';
+  if (r === 0) s += 'border-top:2px solid #000;';
+  if (c === 0) s += 'border-left:2px solid #000;';
+  if (r === h - 1) s += 'border-bottom:2px solid #000;';
+  if (c === w - 1) s += 'border-right:2px solid #000;';
+  return s ? _layer("l5", s) : "";
+}
+// 合并 3+4+5 层（按 z-index 顺序）
+function _bd(bg, r, c, h, w, cg) {
+  return _l1() + _l2(bg && getCellGroup(bg, r, c) === null) + _l3(r, c) + _l4(bg, r, c, h, w, cg) + _l5(r, c, h, w);
+}
+	// 统一网格单元格 HTML
+	function _cellHTML(spaceId, r, c, item, h, w, optCellGroup) {
+	  var gp = 'grid-column:'+(c+1)+';grid-row:'+(r+1)+';';
+	  var cg = optCellGroup !== undefined ? (Array.isArray(optCellGroup) ? (optCellGroup[r]||[])[c] : optCellGroup) : getCellGroup(spaceId, r, c);
+	  if (cg === null && !item)
+	    return '<div class="inv-cell inv-blocked" data-bag="'+spaceId+'" data-row="'+r+'" data-col="'+c+'" style="'+gp+'width:' + CELL_SIZE + 'px;height:' + CELL_SIZE + 'px;position:relative;">'+_bd(spaceId,r,c,h,w,optCellGroup)+'</div>';
+	  if (item && item._occ) {
+	    var adr = item._ar != null ? item._ar : r, adc = item._ac != null ? item._ac : c;
+	    var _occG = C.grid(spaceId); var occItem = _occG && _occG[adr] && _occG[adr][adc] ? _occG[adr][adc] : {};
+	    var occSz = getItemSize(occItem);
+	    return '<div draggable="true" data-drag=\'{"src":"bag","bag":"'+spaceId+'","row":'+adr+',"col":'+adc+',"w":'+occSz.w+',"h":'+occSz.h+'}\' data-drop="bag" data-bag="'+spaceId+'" data-row="'+r+'" data-col="'+c+'" class="grid-item" onclick="showGridItemModal(\''+spaceId+'\','+adr+','+adc+')" style="'+gp+'width:' + CELL_SIZE + 'px;height:' + CELL_SIZE + 'px;overflow:hidden;cursor:pointer;font-size:7px;position:relative;">'+_bd(spaceId,r,c,h,w,false)+'</div>';
+	  }
+	  if (item) {
+	    var sz = getItemSize(item);
+	    return '<div draggable="true" data-drag=\'{"src":"bag","bag":"'+spaceId+'","row":'+r+',"col":'+c+',"w":'+sz.w+',"h":'+sz.h+'}\' data-drop="bag" data-bag="'+spaceId+'" data-row="'+r+'" data-col="'+c+'" class="grid-item" onclick="showGridItemModal(\''+spaceId+'\','+r+','+c+')" style="'+gp+'display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;overflow:hidden;cursor:pointer;font-size:7px;width:100%;height:100%;box-sizing:border-box;position:relative;">'+_bd(spaceId,r,c,h,w,false)+'</div>'+_ovHTML(spaceId,item,r,c,sz.w,sz.h);
+	  }
+	  return '<div class="inv-cell" data-drop="bag" data-bag="'+spaceId+'" data-row="'+r+'" data-col="'+c+'" style="'+gp+'width:' + CELL_SIZE + 'px;height:' + CELL_SIZE + 'px;position:relative;">'+_bd(spaceId,r,c,h,w,optCellGroup)+'</div>';
+	}
+// ===== 物品覆盖层 l6-l12 =====
+function _ovHTML(bagName, item, r, c, w, h) {
+  var dur = item.durability != null ? (item.durability + '/' + (getItemMaxDurability(item) || item.durability)) : null;
+  var _isz = _getIconSize(item.id);
+  var _dsz = _calcIconDisp(_isz, Math.min(w, h) * CELL_SIZE);
+  var o = '';
+  o += '<div class="l6" data-overlay-for="' + bagName + '-' + r + '-' + c + '" style="grid-column:' + (c+1) + '/span ' + w + ';grid-row:' + (r+1) + '/span ' + h + ';pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;z-index:3;background-color:rgba(80,80,80,0.4);position:relative;padding:0;">';
+  o += '<div class="l7" style="position:absolute;inset:0;pointer-events:none;z-index:1;display:none;background:rgba(255,255,255,0.12);"></div>';
+  o += '<div class="l8" style="position:absolute;inset:0;background-image:url(\'' + _getItemIconUrl(item.id) + '\');background-size:' + _dsz + 'px ' + _dsz + 'px;background-repeat:no-repeat;background-position:center;image-rendering:pixelated;"></div>';
+  o += '<div class="l9" style="position:absolute;inset:1px 2px 2px 1px;outline:1px solid #8a8a7a;outline-offset:-1px;pointer-events:none;z-index:1;"></div>';
+  o += '<div class="l10" style="position:absolute;inset:1px 2px 2px 1px;outline:2px solid #a8c4a0;outline-offset:-2px;pointer-events:none;z-index:2;display:none;"></div>';
+  o += '<div class="l11" data-txt style="position:absolute;inset:5px;z-index:3;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none;">';
+  if (item._uid) {
+    o += '<span style="font-size:9px;font-weight:bold;color:#fff;line-height:1.2;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">' + item.name + '</span>';
+    if (item._qty != null || dur) {
+      var t = '';
+      if (item._qty != null) t += item._qty;
+      if (item._qty != null && dur) t += ' ';
+      if (dur) t += dur;
+      o += '<span style="font-size:8px;color:#fff;line-height:1.2;text-align:right;">' + t + '</span>';
+    }
+  }
+  o += '</div>';
+  o += '</div>';
+  return o;
+}
+// 格子边框信息：返回 {rightColor, bottomColor, rightPx, bottomPx, bg}
+// 获取格子边框颜色和粗细
+function cellBorderInfo(bagName, r, c, h, w, optCellGroup) {
+  var data = bagName ? C.get(bagName) : null;
+  var cellGroup = (optCellGroup !== undefined) ? optCellGroup : (data ? data.cellGroup : null);
+  var connected = data ? data.connected !== false : true;
+  var light = '#555', dark = '#000';
+  var g = cellGroup ? (cellGroup[r] != null ? cellGroup[r][c] : null) : (bagName ? getCellGroup(bagName, r, c) : true);
+  if (g == null) {
+    var _tpNull = (r > 0) ? '0' : '2px';
+    var _lpNull = (c > 0) ? '0' : '2px';
+    return { rightColor: dark, bottomColor: dark, rightPx: '2px', bottomPx: '2px', topColor: dark, topPx: _tpNull, leftColor: dark, leftPx: _lpNull, bg: '#0d0d0d' };
+  }
+  var rightColor = dark, rightPx = '2px', bottomColor = dark, bottomPx = '2px';
+  var topColor = dark, topPx = '2px', leftColor = dark, leftPx = '2px';
+  if (c < w - 1) {
+    var rg = cellGroup ? (cellGroup[r] != null ? cellGroup[r][c+1] : null) : (bagName ? getCellGroup(bagName, r, c+1) : true);
+    if (rg != null && g === rg && connected) { rightColor = light; rightPx = '1px'; }
+  }
+  if (r < h - 1) {
+    var bg = cellGroup ? (cellGroup[r+1] != null ? cellGroup[r+1][c] : null) : (bagName ? getCellGroup(bagName, r+1, c) : true);
+    if (bg != null && g === bg && connected) { bottomColor = light; bottomPx = '1px'; }
+  }
+  if (r > 0) topPx = '0';
+  if (c > 0) leftPx = '0';
+  return { rightColor, bottomColor, rightPx, bottomPx, topColor, topPx, leftColor, leftPx, bg: null };
+}
+
+// ===== 容器操作 =====
+function findSpace(bag, w, h) {
+  var data = C.get(bag);
+  if (!data || !data.grid)   return null;
+  for (var r = 0; r <= data.grid.length - h; r++) {
+    for (var c = 0; c <= data.grid[r].length - w; c++) {
+      var ok = true;
+      var baseGroup = null;
+      for (var dr = 0; dr < h && ok; dr++) {
+        for (var dc = 0; dc < w && ok; dc++) {
+          var thisGroup = getCellGroup(bag, r + dr, c + dc);
+          if (baseGroup === null) baseGroup = thisGroup;
+          if (thisGroup === null || thisGroup !== baseGroup || !isCellEmpty(bag, r + dr, c + dc)) ok = false;
+        }
+      }
+      if (ok) return { row: r, col: c };
+    }
+  }
+    return null;
+}
+
+function placeItem(bag, item, row, col) {
+  item = Object.assign({}, item);
+  if (hasTag(item, '容器')) {
+    if (!C.exists(item._uid)) { initContainerGrid(item); }
+    else if (hasTag(item, '保险箱') && !C.getBanTags(item._uid)) { C.setBanTags(item._uid, ['背包', '腰包', '胸包', '保险箱']); }
+  }
+  var sz = getItemSize(item);
+  var data = C.get(bag);
+  data.grid[row][col] = item;
+  for (var dr = 0; dr < sz.h; dr++) {
+    for (var dc = 0; dc < sz.w; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      data.grid[row + dr][col + dc] = { _occ: true, _ar: row, _ac: col };
+    }
+  }
+}
+
+function removeItem(bag, row, col) {
+  var data = C.get(bag);
+  var item = data.grid[row][col];
+  if (!item || item._occ)   return null;
+  var sz = getItemSize(item);
+  for (var dr = 0; dr < sz.h; dr++) {
+    for (var dc = 0; dc < sz.w; dc++) {
+      data.grid[row + dr][col + dc] = null;
+    }
+  }
+  return item;
+}
+
+// 在容器内部空间中查找空位
+function findContainerSpace(cont, w, h) {
+  for (var r = 0; r <= cont.h - h; r++) {
+    for (var c = 0; c <= cont.w - w; c++) {
+      var ok = true, baseGroup = null;
+      for (var dr = 0; dr < h && ok; dr++) {
+        for (var dc = 0; dc < w && ok; dc++) {
+          var tr = r + dr, tc = c + dc;
+          var thisGroup = (cont.cellGroup && cont.cellGroup[tr] !== undefined) ? cont.cellGroup[tr][tc] : true;
+          if (baseGroup === null) baseGroup = thisGroup;
+          if (thisGroup === null || thisGroup !== baseGroup || cont.grid[tr][tc] !== null) ok = false;
+        }
+      }
+      if (ok) return { row: r, col: c };
+    }
+  }
+    return null;
+}
+function placeItemInCont(cont, item, row, col) {
+  item = Object.assign({}, item);
+  if (hasTag(item, '容器')) {
+    if (!C.exists(item._uid)) { initContainerGrid(item); }
+    else if (hasTag(item, '保险箱') && !C.getBanTags(item._uid)) { C.setBanTags(item._uid, ['背包', '腰包', '胸包', '保险箱']); }
+  }
+  var sz = getItemSize(item);
+  cont.grid[row][col] = item;
+  for (var dr = 0; dr < sz.h; dr++) {
+    for (var dc = 0; dc < sz.w; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      cont.grid[row + dr][col + dc] = { _occ: true, _ar: row, _ac: col };
+    }
+  }
+}
+
+function addToBag(item) {
+  var sz = getItemSize(item);
+  for (var i = 0; i < C.bagOrder.length; i++) {
+    var bk = C.bagOrder[i];
+    if (!getBagUnlocked(bk)) continue;
+    var bd = C.get(bk);
+    if (bd && bd.w === 0 && !hasTag(item, '容器')) continue;
+    if (bd && bd.connected === false && (sz.w > 1 || sz.h > 1)) continue;
+    var space = findSpace(bk, sz.w, sz.h);
+    if (space) {
+      placeItem(bk, item, space.row, space.col);
+      return bk;
+    }
+  }
+    return null;
+}
+
+
+
+// ===== 容器渲染 =====
+function renderContainerGrid(spaceId, el, opts) {
+  var sp = C.get(spaceId);
+  if (!sp || !sp.grid) return;
+  if (opts && opts.label) {
+    var _lbl = document.createElement('div');
+    _lbl.style.cssText = 'font-size:11px;color:#888;margin-bottom:3px;';
+    _lbl.textContent = opts.label;
+    el.appendChild(_lbl);
+  }
+  if (opts && opts.unlocked === false) {
+    el.innerHTML += '<div style="color:#444;font-size:10px;padding:8px 0;text-align:center;border:1px solid #333;;">未解锁</div>';
+    return;
+  }
+  if (sp.w === 0) {
+    el.innerHTML += '<div style="color:#444;font-size:10px;padding:8px 0;text-align:center;border:1px solid #333;;">空</div>';
+    return;
+  }
+  el.innerHTML += renderContainerGridHTML(spaceId, sp.grid, sp.w, sp.h, opts && opts.cellGroup);
+}
+
+function renderInvGrid(gridId) {
+  var el = document.getElementById(gridId);
+  if (!el) return;
+  el.innerHTML = '';
+  C.bagOrder.forEach(function(b) {
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'margin-bottom:10px;border:1px solid #3a3a3a;padding:10px;';
+    el.appendChild(wrap);
+    // 装备栏名
+    var _label = b;
+    for (var _si = 0; _si < SLOT_DEFS.length; _si++) { if (SLOT_DEFS[_si].key === b) { _label = SLOT_DEFS[_si].label; break; } }
+    var _item = E.get(b);
+    if (_item) _label += ' - ' + _item.name;
+    var _lbl = document.createElement('div');
+    _lbl.style.cssText = 'font-size:11px;color:#888;margin-bottom:3px;';
+    _lbl.textContent = _label;
+    wrap.appendChild(_lbl);
+    if (C.get(b)) renderContainerGrid(b, wrap, { unlocked: getBagUnlocked(b) });
+  });
+}
+
+function renderStash() {
+  var grids = ['stashGrid'];
+  if (document.getElementById('traderStashGrid')) grids.push('traderStashGrid');
+  for (var _gi = 0; _gi < grids.length; _gi++) {
+    var g = document.getElementById(grids[_gi]);
+    if (g) { g.innerHTML = ""; renderContainerGrid(C.STASH, g);; }
+  }
+}
+// ===== 身体模型 =====
+function renderLimbs() {
+  var parts = [
+    { id: 'LeftHand', label: '左手', col: 1, row: 3 },
+    { id: 'RightHand', label: '右手', col: 3, row: 3 },
+    { id: 'Head', label: '头', col: 2, row: 3 },
+    { id: 'Chest', label: '胸', col: 2, row: 4 },
+    { id: 'LeftLeg', label: '左腿', col: 1, row: 5 },
+    { id: 'RightLeg', label: '右腿', col: 3, row: 5 },
+    { id: 'Abdomen', label: '腹', col: 2, row: 5 },
+  ];
+  function buildHtml(prefix) {
+    var h = '';
+    parts.forEach(function(p) {
+      var key = p.id[0].toLowerCase() + p.id.slice(1);
+      var limb = G.limbs[key];
+      if (!limb) { G.limbs[key] = { hp: 0, max: 0 }; limb = G.limbs[key]; }
+      var ratio = limb.max > 0 ? limb.hp / limb.max : 0;
+      var color;
+      if (ratio >= 1) color = '#6aaa75';
+      else if (ratio >= 0.2) color = '#c4903a';
+      else if (ratio > 0) color = '#b56565';
+      else color = '#000000';
+      h += '<div class="body-part" id="' + prefix + p.id + '" data-drop="bodypart" data-bodypart="' + key + '" style="grid-column:' + p.col + ';grid-row:' + p.row + ';background:' + color + '33;border:1px solid ' + color + ';">';
+      h += '<span class="bp-name">' + p.label + '</span>';
+      h += '<span class="bp-hp">' + limb.hp + '/' + limb.max + '</span></div>';
+    });
+    return h;
+  }
+  var el = document.getElementById('bodyModel');
+  if (el) el.innerHTML = buildHtml('');
+  var ex = document.getElementById('exBodyModel');
+  if (ex) ex.innerHTML = buildHtml('ex');
+}
+// 测试：全身扣血
+function damageAllLimbs(amt) {
+  for (var key in G.limbs) {
+    if (G.limbs.hasOwnProperty(key)) {
+      G.limbs[key].hp = Math.max(0, G.limbs[key].hp - amt);
+    }
+  }
+  renderLimbs();
+}
+
+// 渲染统计页面
+// ===== 统计/技能 =====
+function renderStats() {
+  document.getElementById('stFloor').textContent = G.floor;
+  document.getElementById('stKills').textContent = G.kills;
+  document.getElementById('stGoldAll').textContent = G.totalGold;
+  document.getElementById('stDeaths').textContent = G.deaths;
+}
+
+function renderBestiary() {
+  var list = document.getElementById('bestiaryList');
+  if (!list) return;
+  var enemies = [
+    { name:'叛逃水手', hp:200, atk:0, type:'普通' },
+  ];
+  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">';
+  enemies.forEach(function(e) {
+    var isBoss = e.type === '首领';
+    html += '<div style="background:' + (isBoss ? '#2a2a2a' : '#252525') + ';border:1px solid ' + (isBoss ? '#e94560' : '#333') + ';;padding:8px;">';
+    html += '<div style="font-weight:bold;font-size:13px;' + (isBoss ? 'color:#e94560;' : '') + '">' + e.name + '</div>';
+    html += '<div style="color:#888;font-size:11px;">HP:' + e.hp + ' 攻击:' + e.atk + '</div>';
+    html += '<div style="color:#555;font-size:10px;">' + e.type + '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  list.innerHTML = html;
+}
+
+function renderSkill() {
+  var list = document.getElementById('skillList');
+  if (!list) return;
+  var html = '';
+  var hasSkill = false;
+  var skills = G.skills || {};
+  for (const [name, data] of Object.entries(skills)) {
+    if (data) {
+      hasSkill = true;
+      html += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #333;">';
+      html += '<span>' + name + '</span>';
+      html += '<span style="color:#4ecca3;">Lv.' + (data.level || 0) + ' (' + (data.exp || 0) + '/100)</span>';
+      html += '</div>';
+    }
+  }
+  list.innerHTML = hasSkill ? html : '<div style="color:#666;font-size:13px;">暂无技能</div>';
+}
+
+// ===== 武器槽/副手槽 =====
+function getWeaponSlotCount() {
+  var sling = E.get('sling');
+  return sling ? (sling.slots || 0) : 0;
+}
+
+function getSidearmSlotCount() {
+  // 后续可查询装备物品的 sideSlots 属性来动态增加
+  return 1;
+}
+
+function renderSidearmSlots() {
+  renderSidearmSlotsIn('sidearmSlotsRow');
+  renderSidearmSlotsIn('exSidearmSlotsRow');
+}
+
+function renderSidearmSlotsIn(containerId) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  var count = getSidearmSlotCount();
+  while (E.sidearm.length < count) E.sidearm.push(null);
+  while (E.sidearm.length > count) {
+    var s = E.sidearm.pop();
+    if (s) addToBag(s);
+  }
+  if (count === 0) { container.style.display = 'none'; return; }
+  container.style.display = 'flex';
+  container.innerHTML = E.sidearm.map(function(item, i) {
+    var name = item ? item.name : '空';
+    var cls = item ? '' : 'empty';
+    var dragAttr = item ? 'draggable="true" data-drag=\'{"src":"sidearmSlot","idx":' + i + '}\'' : '';
+    var style = item ? 'style="background-image:url(\'' + _getItemIconUrl(item.id) + '\');background-size:contain;background-repeat:no-repeat;background-position:center;image-rendering:pixelated;"' : '';
+    return '<div class="equip-slot ' + cls + '" ' + dragAttr + ' onclick="showSidearmSlotModal(' + i + ')" data-drop="equip" data-slot="sslot_' + i + '" ' + style + '>' +
+      '<span class="sl">单手' + (i + 1) + '</span>' +
+      '<span class="nm">' + name + '</span>' +
+      (item ? '<span class="ex">' + item.desc + '</span>' : '') +
+    '</div>';
+  }).join('');
+}
+
+function showSidearmSlotModal(idx) {
+  var item = E.sidearm[idx];
+  if (!item) return;
+  _sel = { idx: idx, source: 'sidearmSlot' };
+  document.querySelector('#itemModal .modal-box').setAttribute('data-version', 'equip');
+  document.getElementById('modalTitle').textContent = item.name;
+  document.getElementById('modalDesc').textContent = item.desc;
+  document.getElementById('modalActionBtn').style.display = 'none';
+  document.getElementById('modalTransfer').style.display = 'none';
+  // modalRotateBtn removed
+  document.getElementById('modalDestroyBtn').style.display = 'block';
+  document.getElementById('modalSplitBtn').style.display = 'none';
+  document.getElementById('itemModal').style.zIndex = ++_topZ; document.getElementById('itemModal').style.display = 'flex';
+  positionModalAtCursor(document.querySelector('#itemModal .modal-box'));
+}
+
+function renderWeaponSlots() {
+  renderWeaponSlotsIn('weaponSlotsRow');
+  renderWeaponSlotsIn('exWeaponSlotsRow');
+}
+
+function renderWeaponSlotsIn(containerId) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  var count = getWeaponSlotCount();
+  while (E.weapon.length < count) E.weapon.push(null);
+  while (E.weapon.length > count) {
+    var w = E.weapon.pop();
+    if (w) addToBag(w);
+  }
+  if (count === 0) { container.style.display = 'none'; return; }
+  container.style.display = 'flex';
+  container.innerHTML = E.weapon.map(function(item, i) {
+    var name = item ? item.name : '空';
+    var cls = item ? '' : 'empty';
+    var dragAttr = item ? 'draggable="true" data-drag=\'{"src":"weaponSlot","idx":' + i + '}\'' : '';
+    var style = item ? 'style="background-image:url(\'' + _getItemIconUrl(item.id) + '\');background-size:contain;background-repeat:no-repeat;background-position:center;image-rendering:pixelated;"' : '';
+    return '<div class="equip-slot ' + cls + '" ' + dragAttr + ' onclick="showWeaponSlotModal(' + i + ')" data-drop="equip" data-slot="wslot_' + i + '" ' + style + '>' +
+      '<span class="sl">主武器' + (i + 1) + '</span>' +
+      '<span class="nm">' + name + '</span>' +
+      (item ? '<span class="ex">' + item.desc + '</span>' : '') +
+    '</div>';
+  }).join('');
+}
+
+function showWeaponSlotModal(idx) {
+  var item = E.weapon[idx];
+  if (!item) return;
+  _sel = { idx: idx, source: 'weaponSlot' };
+  document.querySelector('#itemModal .modal-box').setAttribute('data-version', 'equip');
+  document.getElementById('modalTitle').textContent = item.name;
+  document.getElementById('modalDesc').textContent = item.desc;
+  document.getElementById('modalActionBtn').style.display = 'none';
+  document.getElementById('modalTransfer').style.display = 'none';
+  // modalRotateBtn removed
+  document.getElementById('modalDestroyBtn').style.display = 'block';
+  document.getElementById('modalSplitBtn').style.display = 'none';
+  document.getElementById('itemModal').style.zIndex = ++_topZ; document.getElementById('itemModal').style.display = 'flex';
+  positionModalAtCursor(document.querySelector('#itemModal .modal-box'));
+}
+
+// 将装备的容器内部空间同步到对应的背包槽位
+// ===== 商人/交易 =====
+var MERCHANT_DEFS = {
+  shipdoctor: {
+    name: '船医',
+    icon: 'icon_shipdoctor',
+    items: [
+      { id: 'blood_bag_s', row: 10, col: 2, price: 0, currency: '' },
+    ],
+    trades: [
+      { want: { id: 'rusty_knife', qty: 1 }, give: { id: 'blood_bag_s', qty: 1 } },
+    ]
+  },
+  tailor: {
+    name: '裁缝',
+    icon: 'icon_tailor',
+    items: [],
+    trades: []
+  },
+  armourer: {
+    name: '军械士',
+    icon: 'icon_armourer',
+    items: [],
+    trades: []
+  },
+  gunsmith: {
+    name: '枪匠',
+    icon: 'icon_gunsmith',
+    items: [],
+    trades: []
+  },
+  priest: {
+    name: '牧师',
+    icon: 'icon_priest',
+    items: [],
+    trades: []
+  },
+  captain: {
+    name: '船长',
+    icon: 'icon_captain',
+    items: [],
+    trades: []
+  },
+  collector: {
+    name: '收藏家',
+    icon: 'icon_collector',
+    items: [],
+    trades: []
+  }
+};
+var _merchantGrids = {};
+var _tradeBuyGrid = null;
+var _tradePayGrid = null;
+var _tradePayTotal = 0;
+var _currentMerchant = 'shipdoctor';
+
+function initTradeGrids() {
+  _tradeBuyGrid = []; _tradePayGrid = [];
+  for (var r = 0; r < 10; r++) {
+    _tradeBuyGrid[r] = []; _tradePayGrid[r] = [];
+    for (var c = 0; c < 10; c++) { _tradeBuyGrid[r][c] = null; _tradePayGrid[r][c] = null; }
+  }
+}
+initTradeGrids();
+
+function findTradeSpace(grid, w, h) {
+  for (var r = 0; r <= 10 - h; r++) {
+    for (var c = 0; c <= 10 - w; c++) {
+      var ok = true;
+      for (var rr = 0; rr < h && ok; rr++) for (var cc = 0; cc < w && ok; cc++) { if (grid[r+rr][c+cc]) ok = false; }
+      if (ok) return { row: r, col: c };
+    }
+  }
+    return null;
+}
+
+function findTemplate(id) {
+  for (var i = 0; i < ITEMS.length; i++) { if (ITEMS[i].id === id) return ITEMS[i]; }
+    return null;
+}
+
+function findMerchantSpace(grid, w, h) {
+  for (var r = 0; r <= 40 - h; r++) {
+    for (var c = 0; c <= 10 - w; c++) {
+      var ok = true;
+      for (var dr = 0; dr < h && ok; dr++) for (var dc = 0; dc < w && ok; dc++) { if (grid[r+dr][c+dc] !== null) ok = false; }
+      if (ok) return { row: r, col: c };
+    }
+  }
+    return null;
+}
+
+function initMerchantGrids() {
+  _merchantGrids = {};
+  for (var key in MERCHANT_DEFS) {
+    var def = MERCHANT_DEFS[key];
+    var grid = [];
+    for (var r = 0; r < 40; r++) { grid[r] = []; for (var c = 0; c < 10; c++) grid[r][c] = null; }
+    for (var i = 0; i < def.items.length; i++) {
+      var it = def.items[i];
+      var tpl = findTemplate(it.id);
+      if (!tpl) continue;
+      var sz = getItemSize(tpl);
+      var space = findMerchantSpace(grid, sz.w, sz.h);
+      if (!space) continue;
+      for (var r = 0; r < sz.h; r++) for (var c = 0; c < sz.w; c++) { grid[space.row+r][space.col+c] = { _occ: true, _ar: space.row, _ac: space.col }; }
+      grid[space.row][space.col] = { id: it.id, price: it.price, currency: it.currency || '', _template: tpl, _ar: space.row, _ac: space.col };
+    }
+    _merchantGrids[key] = { name: def.name, grid: grid, _spaceId: 'merchant_'+key };
+  }
+}
+try { initMerchantGrids(); } catch(e) { console.error(e); }
+
+function renderMerchantGrid() {
+  var grid = document.getElementById('merchantGrid');
+  if (!grid) return;
+  var key = _currentMerchant || 'shipdoctor';
+  var data = _merchantGrids[key];
+  if (!data) { grid.innerHTML = ''; return; }
+  var html = '';
+  for (var r = 0; r < 40; r++) {
+    for (var c = 0; c < 10; c++) {
+      var cell = data.grid[r][c];
+      if (cell && cell._occ) {
+        html += '<div class="inv-cell" style="grid-column:'+(c+1)+';grid-row:'+(r+1)+';width:var(--cell-size);height:var(--cell-size);position:relative;">'+_bd(null, r, c, 40, 10, false)+'</div>';
+      } else if (cell && cell.id) {
+        var sz = getItemSize(cell._template);
+        html += '<div class="grid-item" draggable="true" data-drag=\'{"src":"merchant","merchant":"'+key+'","row":'+r+',"col":'+c+'}\' style="grid-column:'+(c+1)+';grid-row:'+(r+1)+';width:var(--cell-size);height:var(--cell-size);overflow:hidden;cursor:grab;font-size:7px;position:relative;">'+_bd(null, r, c, 40, 10, false)+'</div>';
+        html += _ovHTML(key, cell._template, r, c, sz.w, sz.h);
+      } else {
+        html += '<div class="inv-cell" style="grid-column:'+(c+1)+';grid-row:'+(r+1)+';width:var(--cell-size);height:var(--cell-size);position:relative;">'+_bd(null, r, c, 40, 10, false)+'</div>';
+      }
+    }
+  }
+  grid.innerHTML = html;
+  document.getElementById('merchantName').textContent = data.name;
+}
+
+
+function renderTradeGrid(grid, gridId) {
+  var el = document.getElementById(gridId);
+  if (!el) return;
+  var html = '';
+  for (var r = 0; r < 10; r++) {
+    for (var c = 0; c < 10; c++) {
+      var item = grid[r][c];
+      if (item && item._occ) continue;
+      if (item) {
+        var sz = getItemSize(item);
+        html += '<div data-drop="buybox" class="grid-item" draggable="true" data-drag=\'{"src":"bag","bag":"tradeBuy","row":'+r+',"col":'+c+'}\' style="grid-column:'+(c+1)+';grid-row:'+(r+1)+';width:var(--cell-size);height:var(--cell-size);overflow:hidden;cursor:grab;font-size:7px;position:relative;">'+_bd(null, r, c, 10, 10, false)+'</div>';
+        html += _ovHTML(gridId, item, r, c, sz.w, sz.h);
+      } else {
+        html += '<div data-drop="buybox" class="inv-cell" style="grid-column:'+(c+1)+';grid-row:'+(r+1)+';width:var(--cell-size);height:var(--cell-size);position:relative;">'+_bd(null, r, c, 10, 10, false)+'</div>';
+      }
+    }
+  }
+  el.innerHTML = html;
+}
+function renderTradeBoxes() {
+  // 检查 buy 框中的物品，根据 trades 计算需要付出的物品
+  var def = MERCHANT_DEFS[_currentMerchant];
+  _tradePayTotal = 0;
+  var wantItems = []; // 收集需要付出的物品
+  for (var r = 0; r < 10; r++) {
+    for (var c = 0; c < 10; c++) {
+      var item = _tradeBuyGrid[r][c];
+      if (item && !item._occ) {
+        // 查找匹配的 trade
+        if (def && def.trades) {
+          for (var i = 0; i < def.trades.length; i++) {
+            if (def.trades[i].give.id === item.id) {
+              var wt = findTemplate(def.trades[i].want.id);
+              if (wt) wantItems.push({ tpl: wt, qty: def.trades[i].want.qty });
+            }
+          }
+        }
+      }
+    }
+  }
+  // 填充 pay 框显示需要付出的物品
+  for (var r = 0; r < 10; r++) for (var c = 0; c < 10; c++) _tradePayGrid[r][c] = null;
+  for (var i = 0; i < wantItems.length; i++) {
+    var wi = wantItems[i];
+    var space = findTradeSpace(_tradePayGrid, wi.tpl.x||1, wi.tpl.y||1);
+    if (space) {
+      var o = Object.assign({}, wi.tpl); assignItemId(o); o._qty = wi.qty;
+      _tradePayGrid[space.row][space.col] = o;
+    }
+  }
+  // 按钮状态：检查玩家是否有需要付出的物品
+  var canTrade = true;
+  for (var i = 0; i < wantItems.length; i++) {
+    if (countItemInBags(wantItems[i].tpl.id) < wantItems[i].qty) { canTrade = false; break; }
+  }
+  var warnEl = document.getElementById('tradeWarning');
+  if (warnEl) {
+    warnEl.style.visibility = (wantItems.length > 0 && !canTrade) ? 'visible' : 'hidden';
+    warnEl.textContent = canTrade ? '' : '背包中缺少置换所需物品';
+  }
+  var btn = document.getElementById('tradeConfirmBtn');
+  if (btn) { btn.disabled = !canTrade || wantItems.length === 0; btn.style.opacity = (!canTrade || wantItems.length === 0) ? '0.4' : '1'; }
+  renderTradeGrid(_tradeBuyGrid, 'tradeBuyGrid');
+  renderTradeGrid(_tradePayGrid, 'tradePayGrid');
+}
+
+function renderTrader() {
+  renderMerchantTabs();
+  renderMerchantGrid();
+  renderTradeBoxes();
+  // 显示金币/银币数量（仅装饰）
+  var coins = countStashCoins();
+  var c1 = document.getElementById('stashCoinCount');
+  if (c1) c1.textContent = '金币 ' + coins.gold + '  银币 ' + coins.silver;
+}
+
+function renderMerchantTabs() {
+  var bar = document.getElementById('merchantTabBar');
+  if (!bar) return;
+  var keys = Object.keys(MERCHANT_DEFS);
+  bar.innerHTML = keys.map(function(key) {
+    var def = MERCHANT_DEFS[key];
+    var active = (key === _currentMerchant) ? ' active' : '';
+    var img = def.icon ? 'background-image:url(\''+_getItemIconUrl(def.icon)+'\');background-size:' + (CELL_SIZE * 2) + 'px ' + (CELL_SIZE * 2) + 'px;background-repeat:no-repeat;background-position:center;image-rendering:pixelated;' : '';
+    return '<button class="sub-tab'+active+'" onclick="switchMerchant(\''+key+'\')" style="'+img+'"><span style="position:absolute;bottom:2px;left:0;right:0;font-size:16px;color:#fff;line-height:1;text-align:center;">'+def.name+'</span></button>';
+  }).join('');
+}
+
+function switchMerchant(key) {
+  if (!MERCHANT_DEFS[key]) return;
+  _currentMerchant = key;
+  initTradeGrids();
+  renderTrader();
+}
+
+function confirmTrade() {
+  // 以物易物逻辑：检查 pay 框物品，从玩家背包扣除后给与 buy 框物品
+  var giveItems = [];
+  var wantItems = [];
+  for (var r = 0; r < 10; r++) for (var c = 0; c < 10; c++) {
+    var bi = _tradeBuyGrid[r][c];
+    if (bi && !bi._occ) giveItems.push({ id: bi.id, qty: bi._qty || 1 });
+    var pi = _tradePayGrid[r][c];
+    if (pi && !pi._occ) wantItems.push({ id: pi.id, qty: pi._qty || 1 });
+  }
+  if (giveItems.length === 0) return;
+  // 检查并扣除玩家背包中的 want 物品
+  for (var i = 0; i < wantItems.length; i++) {
+    if (!removeFromBags(wantItems[i].id, wantItems[i].qty)) {
+      showMsg('背包中缺少所需物品', 'info'); return;
+    }
+  }
+  // 给与 give 物品到玩家背包
+  for (var i = 0; i < giveItems.length; i++) {
+    var tpl = findTemplate(giveItems[i].id);
+    if (!tpl) continue;
+    for (var j = 0; j < giveItems[i].qty; j++) addToBag(Object.assign({}, tpl));
+  }
+  initTradeGrids();
+  renderAll();
+  showMsg('置换成功', 'ok');
+}
+
+function cancelTrade() {
+  initTradeGrids();
+  renderTrader();
+}
+
+function countStashCoins() {
+  var gold = 0, silver = 0, visited = {};
+  function scan(g) {
+    for (var r = 0; r < g.length; r++) for (var c = 0; c < g[r].length; c++) {
+      var it = g[r][c];
+      if (!it || it._occ) continue;
+      if (it.id === 'coin_gold') gold += it._qty || 1;
+      if (it.id === 'coin_silver') silver += it._qty || 1;
+      if ((it.cx||it.cy) && it._uid && !visited[it._uid]) {
+        visited[it._uid] = true;
+        if (!C.exists(it._uid)) initContainerGrid(it);
+        var sp = C.get(it._uid);
+        if (sp && sp.grid) scan(sp.grid);
+      }
+    }
+  }
+  var grid = C.get(C.STASH) && C.get(C.STASH).grid;
+  if (grid) scan(grid);
+  return { gold: gold, silver: silver };
+}
+
+function countItemInBags(id) {
+  var total = 0;
+  for (var k in C._d) {
+    var grid = C.grid(k); if (!grid) continue;
+    for (var r = 0; r < grid.length; r++) for (var c = 0; c < grid[r].length; c++) {
+      var it = grid[r][c];
+      if (it && !it._occ && it.id === id) total += it._qty || 1;
+    }
+  }
+  return total;
+}
+
+function removeFromBags(id, qty) {
+  var need = qty;
+  for (var k in C._d) {
+    var grid = C.grid(k); if (!grid) continue;
+    for (var r = 0; r < grid.length && need > 0; r++) for (var c = 0; c < grid[r].length && need > 0; c++) {
+      var it = grid[r][c];
+      if (it && !it._occ && it.id === id) {
+        if (it._qty) { if (it._qty <= need) { need -= it._qty; grid[r][c] = null; } else { it._qty -= need; need = 0; } }
+        else { need--; grid[r][c] = null; }
+      }
+    }
+  }
+  return need === 0;
+}
+
+// ===== 核心渲染 =====
+function renderAll() { syncSlots(); renderEquip(); renderWeaponSlots(); renderSidearmSlots(); renderInventory(); renderStash(); renderLimbs(); renderStats(); renderSkill(); renderSave(); renderBestiary(); refreshContainerModal(); try { renderTrader(); } catch(e) { console.error(e); } }
+function syncSlots() {
+  for (var _si = 0; _si < SLOT_DEFS.length; _si++) {
+    var _sd = SLOT_DEFS[_si];
+    if (!_sd.bagUnlock) continue;
+    var _eq = E.get(_sd.key);
+    var _sp = C.get(_sd.bagUnlock);
+    if (!_sp) continue;
+    if (_eq && _eq._uid && hasTag(_eq, '容器')) {
+      if (!C.exists(_eq._uid)) initContainerGrid(_eq);
+      var _src = C.get(_eq._uid);
+      if (_src) {
+        _sp.grid = _src.grid;
+        _sp.w = _src.w;
+        _sp.h = _src.h;
+        _sp.cellGroup = _src.cellGroup;
+        _sp._banTags = _src._banTags;
+      } else { _sp.w = 0; _sp.h = 0; _sp.grid = []; delete _sp.cellGroup; delete _sp._banTags; }
+    } else if (_eq && _eq._uid && C.get(_eq._uid)) {
+      var _src = C.get(_eq._uid);
+      _sp.grid = _src.grid;
+      _sp.w = _src.w;
+      _sp.h = _src.h;
+      _sp.cellGroup = _src.cellGroup;
+      _sp._banTags = _src._banTags;
+    } else {
+      _sp.grid = [];
+      _sp.w = 0;
+      _sp.h = 0;
+      delete _sp.cellGroup;
+      delete _sp._banTags;
+    }
+  }
+  }
+// 传递性容器包含检测：检查 targetUid 是否（直接/间接）存在于 containerUid 的内部空间中
+function isItemInContainer(targetUid, containerUid) {
+  var sp = C.get(containerUid);
+  if (!sp) return false;
+  for (var r = 0; r < sp.h; r++) {
+    for (var c = 0; c < sp.w; c++) {
+      var cell = sp.grid[r][c];
+      if (cell && !cell._occ && cell._uid) {
+        if (cell._uid === targetUid) return true;
+        if (isItemInContainer(targetUid, cell._uid)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function refreshContainerModal() {
+  for (var i = 0; i < _openContainerModals.length; i++) {
+    var m = _openContainerModals[i];
+    if (!m.item._uid || !C.exists(m.item._uid)) initContainerGrid(m.item);
+    var sp = C.get(m.item._uid);
+    var _oldSp = C.get(m.bagName);
+    sp._label = sp._label || (_oldSp ? _oldSp._label : null);
+    C.assign(m.bagName, sp);
+    m.contentDiv.innerHTML = ""; renderContainerGrid(m.bagName, m.contentDiv, { cellGroup: sp.cellGroup });
+  }
+}
+
+// 装备物品
+function equipItem(bag, row, col) {
+  var data = C.get(bag);
+  if (!data || !data.grid) return;
+  var item = data.grid[row][col];
+  if (!item) return;
+  // 装备该物品时，关闭已打开的容器浮窗
+  if (item._uid) {
+    for (var _i = _openContainerModals.length - 1; _i >= 0; _i--) {
+      if (_openContainerModals[_i].item._uid === item._uid) {
+        closeContainerModal(_openContainerModals[_i].overlay);
+        break;
+      }
+    }
+  }
+  if (hasTag(item, '武器')) {
+    var slotIdx = E.weapon.indexOf(null);
+    if (slotIdx >= 0) {
+      E.weapon[slotIdx] = item;
+      removeItem(bag, row, col);
+      renderAll();
+      showMsg('装备了 ' + item.name, 'suc');
+      return;
+    }
+  }
+  if (hasTag(item, '单手')) {
+    var slotIdx = E.sidearm.indexOf(null);
+    if (slotIdx >= 0) {
+      E.sidearm[slotIdx] = item;
+      removeItem(bag, row, col);
+      renderAll();
+      showMsg('装备了 ' + item.name, 'suc');
+      return;
+    }
+  }
+  showMsg('没有空的武器或单手槽', 'info');
+  const slot = findSlot(item);
+  if (!slot) { showMsg('不能装备该物品', 'info'); return; }
+  const old = E.get(slot);
+  if (old) {
+    // 确保来源 bag（可能是 _cont_）的引用存在
+    if (bag.indexOf('_cont_') === 0 && !C.exists(bag)) {
+      var _reUid = parseInt(bag.substring(6), 10);
+      if (C.get(_reUid)) C.assign(bag, C.get(_reUid));
+    }
+    var _oldSz = getItemSize(old);
+    var _oldSpace = findSpace(bag, _oldSz.w, _oldSz.h);
+    if (!_oldSpace) {
+      return;
+    }
+    removeItem(bag, row, col);
+    E.set(slot, item);
+    placeItem(bag, old, _oldSpace.row, _oldSpace.col);
+    if (C.exists(item._uid)) C.assign(slot, C.get(item._uid));
+  } else {
+    E.set(slot, item);
+    removeItem(bag, row, col);
+  }
+  if (C.exists(item._uid)) C.assign(slot, C.get(item._uid));
+  renderAll();
+  showMsg('装备了 ' + item.name, 'suc');
+}
+
+// 卸下装备（优先存入储藏箱，再查背包，无空间则弹窗）
+function unequip(slot) {
+  const item = E.get(slot);
+  if (!item) return;
+
+  // 收集所有需要存放的物品（主物品 + 背带关联的武器）
+  var items = [{ item: item }];
+  if (slot === 'sling' && E.weapon) {
+    E.weapon.forEach(function(w) { if (w) items.push({ item: w }); });
+  }
+
+  // 尝试存入储藏箱或背包
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i].item;
+    var itSz = getItemSize(it);
+    items[i].placed = false;
+    if (G._currentMap) {
+      // 远征：仅查背包
+      if (addToBag(it)) items[i].placed = true;
+    } else {
+      // 营地：先查储藏箱，再查背包
+      var sp = findSpace(C.STASH, itSz.w, itSz.h);
+      if (sp) {
+        placeItem(C.STASH, it, sp.row, sp.col);
+        items[i].placed = true;
+      } else if (addToBag(it)) {
+        items[i].placed = true;
+      }
+    }
+  }
+
+  var allPlaced = items.every(function(x) { return x.placed; });
+  if (!allPlaced) {
+    showMsg('无空间存放！', 'info');
+    return;
+  }
+
+  // 全部存入成功后才清除装备位
+  C.delete(slot);
+  E.clear(slot);
+  if (slot === 'sling' && E.weapon) {
+    E.clearWeapon();
+  }
+  renderAll();
+  showMsg(item.name + ' 已卸下', 'info');
+}
+
+function showMsg(text, type) {
+  var el = document.getElementById('equipMsg');
+  if (el) { el.textContent = text; el.className = 'msg ' + (type || 'info'); }
+  var ex = document.getElementById('exEquipMsg');
+  if (ex) { ex.textContent = text; ex.className = 'msg ' + (type || 'info'); }
+}
+
+// 居中弹窗提示，2秒后自动消失
+function showCenterMsg(text) {
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;z-index:' + (++_topZ) + ';pointer-events:none;';
+  var box = document.createElement('div');
+  box.style.cssText = 'background:#252525;border:2px solid #3a3a3a;;padding:24px 36px;font-size:16px;color:#e0e0e0;text-align:center;';
+  box.textContent = text;
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  setTimeout(function() { overlay.remove(); }, 1000);
+}
+
+// 导航切换
+function showScreen(id) {
+  // 切换页面时关闭所有浮窗
+  closeModal();
+  closeContainerModal();
+  closeConfirmModal();
+  closeDetailModal();
+  document.getElementById('itemOverviewModal').style.display = 'none';
+  // 远征中锁定装备/储藏箱/商人页面
+  if (G._currentMap && (id === 'equip' || id === 'camp' || id === 'trader')) return;
+  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('screen' + id.charAt(0).toUpperCase() + id.slice(1)).classList.add('active');
+  document.getElementById('nav' + id.charAt(0).toUpperCase() + id.slice(1)).classList.add('active');
+  if (id === 'dungeon') {
+    if (G._currentMap) renderExpedition();
+    else renderMapSelect();
+  }
+  if (id !== 'dungeon') renderAll();
+}
+
+// === 物品菜单 ===
+var _sel = null;
+
+
+function showGridItemModal(bag, row, col) {
+  var data = C.get(bag);
+  if (!data || !data.grid) return;
+  var item = data.grid[row][col];
+  if (!item) return;
+  _sel = { row: row, col: col, source: bag };
+  document.querySelector('#itemModal .modal-box').setAttribute('data-version', 'entity');
+  document.getElementById('modalTitle').textContent = item.name;
+  document.getElementById('modalTransfer').style.display = 'none';
+  // modalRotateBtn removed
+  document.getElementById('modalDestroyBtn').style.display = 'block';
+  document.getElementById('modalOpenBtn').style.display = 'none';
+  document.getElementById('modalSplitBtn').style.display = (item._qty != null && item._qty > 1) ? 'inline-block' : 'none';
+  if (hasTag(item, '容器')) {
+    document.getElementById('modalActionBtn').style.display = 'none';
+    document.getElementById('modalOpenBtn').style.display = 'inline-block';
+  } else if (hasTag(item, '消耗品')) {
+    document.getElementById('modalActionBtn').textContent = '使用';
+    document.getElementById('modalActionBtn').style.display = 'none';
+  } else {
+    document.getElementById('modalActionBtn').style.display = 'none';
+  }
+  document.getElementById('itemModal').style.zIndex = ++_topZ; document.getElementById('itemModal').style.display = 'flex';
+  positionModalAtCursor(document.querySelector('#itemModal .modal-box'));
+}
+
+function showEquipModal(slot) {
+  var item = E.get(slot);
+  if (!item) return;
+  _sel = { slot: slot, source: 'equipped' };
+  document.querySelector('#itemModal .modal-box').setAttribute('data-version', 'equip');
+  document.getElementById('modalTitle').textContent = item.name;
+  document.getElementById('modalActionBtn').style.display = 'none';
+  document.getElementById('modalTransfer').style.display = 'none';
+  // modalRotateBtn removed
+  document.getElementById('modalDestroyBtn').style.display = 'block';
+  document.getElementById('modalOpenBtn').style.display = 'none';
+  document.getElementById('modalSplitBtn').style.display = 'none';
+  // 容器类物品：显示 打开
+  if (hasTag(item, '容器')) {
+    document.getElementById('modalOpenBtn').style.display = 'inline-block';
+  }
+  document.getElementById('itemModal').style.zIndex = ++_topZ; document.getElementById('itemModal').style.display = 'flex';
+  positionModalAtCursor(document.querySelector('#itemModal .modal-box'));
+}
+
+function closeModal() {
+  var box = document.querySelector('#itemModal .modal-box');
+  if (box) {
+    box.style.position = '';
+    box.style.left = '';
+    box.style.top = '';
+    box.style.margin = '';
+  }
+  document.getElementById('itemModal').style.display = 'none';
+  _sel = null;
+}
+
+// 数量选择弹窗
+var _qtySel = null;
+var _qtyMode = ''; // ''=取出, 'split'=拆分
+
+function itemSplit() {
+  if (!_sel || !isBagSource(_sel.source)) return;
+  var data = C.get(_sel.source);
+  if (!data || !data.grid) return;
+  var item = data.grid[_sel.row][_sel.col];
+  if (!item || item._qty == null || item._qty <= 1) return;
+  _qtyMode = 'split';
+  _qtySel = { source: _sel.source, row: _sel.row, col: _sel.col };
+  document.getElementById('qtyItemInfo').textContent = '拆分 ' + item.name + '（当前 ' + item._qty + '）';
+  document.querySelector('#qtyModal .modal-header h3').textContent = '拆分物品';
+  var slider = document.getElementById('qtySlider');
+  var inp = document.getElementById('qtyInput');
+  slider.max = item._qty - 1;
+  slider.value = Math.ceil((item._qty - 1) / 2);
+  inp.max = item._qty - 1;
+  inp.value = slider.value;
+  document.getElementById('qtyModal').style.zIndex = ++_topZ;
+  document.getElementById('qtyModal').style.display = 'flex';
+  positionModalAtCursor(document.querySelector('#qtyModal .modal-box'));
+}
+
+function confirmSplit() {
+  if (!_qtySel) return;
+  var qty = parseInt(document.getElementById('qtyInput').value, 10);
+  if (isNaN(qty) || qty < 1) { showMsg('数量无效', 'info'); return; }
+  var data = C.get(_qtySel.source);
+  if (!data || !data.grid) return;
+  var item = data.grid[_qtySel.row][_qtySel.col];
+  if (!item || item._qty == null || item._qty <= qty) { showMsg('数量超出', 'info'); return; }
+  var newItem = Object.assign({}, item);
+  newItem._qty = qty;
+  assignItemId(newItem);
+  if (hasTag(newItem, '容器')) initContainerGrid(newItem);
+  item._qty -= qty;
+  var sz = getItemSize(newItem);
+  var space = findSpace(_qtySel.source, sz.w, sz.h);
+  if (space) {
+    placeItem(_qtySel.source, newItem, space.row, space.col);
+    closeQtyModal();
+    closeModal();
+    renderAll();
+  } else {
+    item._qty += qty;
+    showMsg('背包中没有足够空间', 'info');
+    _qtyMode = '';
+  }
+}
+
+function showQuantityPicker(idx) {
+  var template = ITEMS[idx];
+  if (!template) return;
+  _qtySel = { idx: idx };
+
+  var maxQty = 1;
+  if (template.stack) {
+    maxQty = template.stack * 5;
+  } else {
+    var stash = C.get(C.STASH);
+    if (stash && stash.grid) {
+      var empty = 0;
+      for (var r = 0; r < stash.grid.length; r++) {
+        for (var c = 0; c < stash.grid[r].length; c++) {
+          if (stash.grid[r][c] === null) empty++;
+        }
+      }
+      var sz = getItemSize(template);
+      maxQty = Math.max(1, Math.floor(empty / (sz.w * sz.h)));
+    }
+  }
+
+  document.getElementById('qtyItemInfo').textContent = template.name;
+  var slider = document.getElementById('qtySlider');
+  var inp = document.getElementById('qtyInput');
+  slider.max = maxQty;
+  slider.value = 1;
+  inp.max = maxQty;
+  inp.value = 1;
+  document.getElementById('qtyModal').style.zIndex = ++_topZ;
+  document.getElementById('qtyModal').style.display = 'flex';
+  positionModalAtCursor(document.querySelector('#qtyModal .modal-box'));
+}
+
+function syncQtyInput() {
+  var slider = document.getElementById('qtySlider');
+  var inp = document.getElementById('qtyInput');
+  inp.value = slider.value;
+}
+
+function syncQtySlider() {
+  var slider = document.getElementById('qtySlider');
+  var inp = document.getElementById('qtyInput');
+  var val = parseInt(inp.value, 10);
+  if (isNaN(val) || val < 1) val = 1;
+  if (val > parseInt(slider.max, 10)) val = parseInt(slider.max, 10);
+  slider.value = val;
+  inp.value = val;
+}
+
+function closeQtyModal() {
+  document.getElementById('qtyModal').style.display = 'none';
+  _qtySel = null;
+  _qtyMode = '';
+  document.querySelector('#qtyModal .modal-header h3').textContent = '取出物品';
+}
+
+function confirmTakeout() {
+  if (_qtyMode === 'split') { confirmSplit(); return; }
+  if (!_qtySel) return;
+  var template = ITEMS[_qtySel.idx];
+  if (!template) return;
+  var qty = parseInt(document.getElementById('qtyInput').value, 10);
+  if (isNaN(qty) || qty < 1) { showMsg('数量无效', 'info'); return; }
+
+  var placed = 0;
+  if (template.stack) {
+    var remaining = qty;
+    while (remaining > 0) {
+      var item = Object.assign({}, template);
+      assignItemId(item);
+      item._qty = Math.min(remaining, template.stack);
+      if (hasTag(item, '容器')) initContainerGrid(item);
+      var sz = getItemSize(item);
+      var space = findSpace(C.STASH, sz.w, sz.h);
+      if (space) {
+        placeItem(C.STASH, item, space.row, space.col);
+        placed += item._qty;
+        remaining -= item._qty;
+      } else {
+        if (placed === 0) showMsg('储藏箱已满！', 'info');
+        break;
+      }
+    }
+  } else {
+    for (var i = 0; i < qty; i++) {
+      var item = Object.assign({}, template);
+      assignItemId(item);
+      if (hasTag(item, '容器')) initContainerGrid(item);
+      var sz = getItemSize(item);
+      var space = findSpace(C.STASH, sz.w, sz.h);
+      if (space) {
+        placeItem(C.STASH, item, space.row, space.col);
+        placed++;
+      } else {
+        if (i === 0) showMsg('储藏箱已满！', 'info');
+        break;
+      }
+    }
+  }
+
+  if (placed > 0) showMsg('已存入储藏箱: ' + template.name + ' x' + placed, 'suc');
+  closeQtyModal();
+  renderAll();
+}
+
+// 弹窗拖拽
+var _modalDrag = null, _topZ = 1001, _dragItem = null, _dragSrc = null, _dragSize = {w:1,h:1}, _dragHL = [], _dragL11 = [], _dragL13 = [], _dragRAF = null, _dragRotated = false, _dragOrigSize = null, _dragGrabOffset = null, _lastSnapBag = null, _lastSnapRow = -1, _lastSnapCol = -1, _lastSnapItemR = 0, _lastSnapItemC = 0, _openContainerModals = [];
+var _lastMX = 0, _lastMY = 0;
+document.addEventListener('mousemove', function(e) {
+  _lastMX = e.clientX;
+  _lastMY = e.clientY;
+});
+function positionModalAtCursor(box) {
+  var w = Math.min(box.offsetWidth || 260, 400);
+  var h = Math.min(box.offsetHeight || 200, 300);
+  var mx = Math.min(_lastMX + 15, window.innerWidth - w - 10);
+  var my = Math.min(_lastMY + 15, window.innerHeight - h - 10);
+  mx = Math.max(mx, 10);
+  my = Math.max(my, 10);
+  box.style.position = 'fixed';
+  box.style.left = mx + 'px';
+  box.style.top = my + 'px';
+  box.style.margin = '0';
+}
+document.addEventListener('mousedown', function(e) {
+  var box = e.target.closest('.modal-box');
+  if (box) {
+    var overlay = box.closest('.modal-overlay');
+    if (overlay) overlay.style.zIndex = ++_topZ;
+  }
+});
+document.addEventListener('mousedown', function(e) {
+  var box = e.target.closest('.modal-box');
+  if (!box) return;
+  if (e.target.closest('button, .mbtn, .inv-item, .inv-item *, .grid-item, .grid-item *, input, select, textarea')) return;
+  var rect = box.getBoundingClientRect();
+  box.style.position = 'fixed';
+  box.style.left = rect.left + 'px';
+  box.style.top = rect.top + 'px';
+  box.style.margin = '0';
+  _modalDrag = { box: box, startX: e.clientX, startY: e.clientY, left: rect.left, top: rect.top };
+  e.preventDefault();
+});
+document.addEventListener('mousemove', function(e) {
+  if (!_modalDrag) return;
+  _modalDrag.box.style.left = (_modalDrag.left + e.clientX - _modalDrag.startX) + 'px';
+  _modalDrag.box.style.top = (_modalDrag.top + e.clientY - _modalDrag.startY) + 'px';
+});
+document.addEventListener('mouseup', function() { _modalDrag = null; });
+
+function itemDetail() {
+  if (!_sel) return;
+  var item;
+  if (_sel.source === 'equipped') { item = E.get(_sel.slot); }
+  else if (_sel.source === 'weaponSlot') { item = E.weapon[_sel.idx]; }
+  else if (_sel.source === 'overview') { item = ITEMS[_sel.idx]; }
+  else if (_sel.source === C.STASH) { item = C.getCell(C.STASH, _sel.row, _sel.col); }
+  else if (isBagSource(_sel.source)) { item = C.getCell(_sel.source, _sel.row, _sel.col); }
+  if (!item) return;
+
+  // 每个物品唯一 key，已有则置顶
+  var key = _sel.source;
+  if (_sel.source === 'overview') key += '_' + _sel.idx;
+  else if (_sel.source === 'equipped') key += '_' + _sel.slot;
+  else if (_sel.source === 'weaponSlot') key += '_' + _sel.idx;
+  else key += '_' + (_sel.row|0) + '_' + (_sel.col|0);
+  var old = document.querySelector('.detail-overlay[data-key="' + key + '"]');
+  if (old) { old.style.zIndex = ++_topZ; return; }
+
+  var lines = [];
+  var tagStr = item.tags ? item.tags.join(' · ') : '';
+  if (tagStr) lines.push('<div style="color:#e94560;font-size:11px;">' + tagStr + '</div>');
+  if (item.desc) lines.push('<div style="color:#888;font-size:11px;margin-bottom:4px;">' + item.desc + '</div>');
+
+  var iconHtml = item.id ? '<div style="width:90px;height:90px;margin:0 auto;background-image:url(\'' + _getItemIconUrl(item.id) + '\');background-size:contain;background-repeat:no-repeat;background-position:center;image-rendering:pixelated;"></div>' : '';
+
+  var props = [];
+  var sz = getItemSize(item);
+  if (sz.w > 1 || sz.h > 1) props.push('尺寸 ' + sz.w + 'x' + sz.h);
+  if (item.atk) props.push('攻击+' + item.atk);
+  if (item.def) props.push('防御+' + item.def);
+  if (item.spd) props.push('速度' + (item.spd > 0 ? '+' : '') + item.spd);
+  if (item.heal) props.push('治疗+' + item.heal);
+  if (item.durability != null) {
+    var _mD = getItemMaxDurability(item) || item.durability;
+    var durL = hasTag(item, '消耗品') ? '剩余次数' : '耐久';
+    props.push(durL + ' ' + item.durability + '/' + _mD);
+  }
+  if (item.stack) props.push('堆叠上限 ' + item.stack);
+  if (_sel.source !== 'overview' && item._qty) props.push('数量 ' + item._qty);
+  var partTags = ["胸甲","头盔","手臂","腰","腿","背带","衣服","裤子"];
+  for (var _pt = 0; _pt < partTags.length; _pt++) {
+    if (hasTag(item, partTags[_pt])) { props.push("部位 " + partTags[_pt]); break; }
+  }
+  var overlay = document.createElement('div');
+  overlay.className = 'detail-overlay';
+  overlay.setAttribute('data-key', key);
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:' + (++_topZ) + ';pointer-events:none;';
+  var box = document.createElement('div');
+  box.className = 'modal-box';
+  box.style.cssText = 'position:fixed;;padding:14px;max-width:350px;min-width:200px;pointer-events:auto;';
+  var header = document.createElement('div');
+  header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
+  header.innerHTML = '<span style="font-size:15px;font-weight:bold;color:#fff;">' + item.name + '</span><button onclick="this.closest(\'.detail-overlay\').remove()" style="background:none;border:none;color:#888;cursor:pointer;font-size:16px;">✕</button>';
+  box.appendChild(header);
+  if (iconHtml) {
+    var w = document.createElement('div');
+    w.style.cssText = 'text-align:center;margin:8px 0;';
+    w.innerHTML = iconHtml;
+    box.appendChild(w);
+  }
+  var c = document.createElement('div');
+  c.style.cssText = 'font-size:12px;color:#ccc;line-height:1.6;';
+  c.innerHTML = lines.join('\n');
+  box.appendChild(c);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  positionModalAtCursor(box);
+}
+
+function closeDetailModal() {
+  var modals = document.querySelectorAll('.detail-overlay');
+  if (modals.length) modals[modals.length - 1].remove();
+}
+
+function isBagSource(src) {
+  return !!(C.grid(src));
+}
+
+function resolveDragItem(src) {
+  if (src.src === 'bag') { return C.getCell(src.bag, src.row, src.col); }
+  if (src.src === 'equipped') return E.get(src.slot);
+  if (src.src === 'weaponSlot') return E.weapon[src.idx];
+  if (src.src === 'sidearmSlot') return E.sidearm[src.idx];
+    return null;
+}
+
+function isValidEquip(slot, item) {
+  if (!item || !slot) return false;
+  // 武器/单手多槽前缀匹配
+  if (slot.indexOf('wslot_') === 0) return hasTag(item, '武器') && hasTag(item, '可装备');
+  if (slot.indexOf('sslot_') === 0) return hasTag(item, '单手') && hasTag(item, '可装备');
+  for (var i = 0; i < SLOT_DEFS.length; i++) {
+    if (slot === SLOT_DEFS[i].key) return hasTag(item, SLOT_DEFS[i].tag) && hasTag(item, '可装备');
+  }
+  return false;
+}
+
+function itemAction() {
+  if (!_sel) return;
+  if (_sel.source === 'equipped') {
+    unequip(_sel.slot);
+  } else if (_sel.source === 'weaponSlot') {
+    var wItem = E.weapon[_sel.idx];
+    if (wItem) { addToBag(wItem); E.weapon[_sel.idx] = null; renderAll(); }
+  } else if (_sel.source === 'sidearmSlot') {
+    var sItem = E.sidearm[_sel.idx];
+    if (sItem) { addToBag(sItem); E.sidearm[_sel.idx] = null; renderAll(); }
+  } else if (isBagSource(_sel.source)) {
+    var _item = C.getCell(_sel.source, _sel.row, _sel.col);
+    if (_item && hasTag(_item, '医用品')) {
+      useItem(_sel.source, _sel.row, _sel.col);
+    } else {
+      equipItem(_sel.source, _sel.row, _sel.col);
+    }
+  } else if (_sel.source === 'overview') {
+    var _qTpl = ITEMS[_sel.idx];
+    if (_qTpl && _qTpl.stack) {
+      var _qIdx = _sel.idx;
+      closeModal();
+      showQuantityPicker(_qIdx);
+    } else {
+      var item = Object.assign({}, _qTpl); assignItemId(item); if (item.stack && !item._qty) item._qty = 1; if (hasTag(item, '容器')) initContainerGrid(item);
+      var sz = getItemSize(item);
+      var space = findSpace(C.STASH, sz.w, sz.h);
+      if (space) { placeItem(C.STASH, item, space.row, space.col); showMsg('已存入储藏箱: ' + item.name, 'suc'); }
+      else { showMsg('储藏箱已满！', 'info'); }
+      closeModal();
+      renderAll();
+    }
+    return;
+  } else {
+    showMsg('必须先取回背包才能装备', 'info');
+  }
+  closeModal();
+}
+
+function useItem(bag, row, col) {
+  var data = C.get(bag);
+  if (!data || !data.grid) return;
+  var item = data.grid[row][col];
+  if (!item) return;
+  var healAmt = item.heal || 25;
+  G.hp = Math.min(G.maxHp, G.hp + healAmt);
+  showMsg('使用 ' + item.name + '，恢复 ' + healAmt + ' HP', 'suc');
+  removeItem(bag, row, col);
+  renderAll();
+}
+
+function itemTransfer() {
+  if (!_sel) return;
+  if (_sel.source === C.STASH) {
+    var data = C.get(C.STASH);
+    if (!data || !data.grid) return;
+    var item = data.grid[_sel.row][_sel.col];
+    if (!item) return;
+    var bag = addToBag(item);
+    if (bag) { removeItem(C.STASH, _sel.row, _sel.col); }
+    else { showMsg('所有背包已满！', 'info'); }
+  } else if (isBagSource(_sel.source)) {
+    var data = C.get(_sel.source);
+    if (!data || !data.grid) return;
+    var item = data.grid[_sel.row][_sel.col];
+    if (!item) return;
+    removeItem(_sel.source, _sel.row, _sel.col);
+    var sz = getItemSize(item);
+    var space = findSpace(C.STASH, sz.w, sz.h);
+    if (space) { placeItem(C.STASH, item, space.row, space.col); }
+    else {
+      placeItem(_sel.source, item, _sel.row, _sel.col);
+      showMsg('储藏箱已满！', 'info');
+      closeModal(); renderAll(); return;
+    }
+  }
+  closeModal();
+  renderAll();
+}
+
+function itemDestroy() {
+  if (!_sel) return;
+  var item;
+  if (_sel.source === 'equipped') {
+    item = E.get(_sel.slot);
+    if (item) E.clear(_sel.slot);
+  } else if (_sel.source === 'weaponSlot') {
+    item = E.weapon[_sel.idx];
+    if (item) E.weapon[_sel.idx] = null;
+  } else if (isBagSource(_sel.source)) {
+    var data = C.get(_sel.source);
+    if (!data || !data.grid) return;
+    item = data.grid[_sel.row][_sel.col];
+    if (item) removeItem(_sel.source, _sel.row, _sel.col);
+  }
+  if (item) showMsg(item.name + ' 已销毁', 'info');
+  closeModal();
+  renderAll();
+}
+
+function showOverviewItemModal(idx) {
+  var item = ITEMS[idx];
+  if (!item) return;
+  _sel = { idx: idx, source: 'overview' };
+  document.querySelector('#itemModal .modal-box').setAttribute('data-version', 'template');
+  document.getElementById('modalTitle').textContent = item.name;
+  document.getElementById('modalActionBtn').textContent = '取出';
+  document.getElementById('modalActionBtn').style.display = 'inline-block';
+  document.getElementById('modalTransfer').style.display = 'none';
+  document.getElementById('modalDestroyBtn').style.display = 'block';
+  // modalRotateBtn removed
+  document.getElementById('modalOpenBtn').style.display = 'none';
+  document.getElementById('modalSplitBtn').style.display = 'none';
+  document.getElementById('itemModal').style.zIndex = ++_topZ; document.getElementById('itemModal').style.display = 'flex';
+  positionModalAtCursor(document.querySelector('#itemModal .modal-box'));
+}
+
+// 为物品生成唯一实体ID
+function assignItemId(item) {
+  if (!item._uid) {
+    item._uid = ++G._nextId;
+    if (hasTag(item, '容器') && !C.exists(item._uid)) initContainerGrid(item);
+  }
+  return item._uid;
+}
+
+// 初始化容器物品的独立内部空间（通过ID注册表绑定）
+function initContainerGrid(item) {
+  assignItemId(item);
+  if (C.exists(item._uid)) return;
+  var w = item.cx != null ? item.cx : 5, h = item.cy != null ? item.cy : 3;
+  var grid = [];
+  for (var r = 0; r < h; r++) { grid[r] = []; for (var c = 0; c < w; c++) grid[r][c] = null; }
+  var cellGroup = item._cellGroup;
+  if (!cellGroup) {
+    cellGroup = [];
+    for (var r = 0; r < h; r++) { cellGroup[r] = []; for (var c = 0; c < w; c++) cellGroup[r][c] = 'A'; }
+  }
+  var _banTags = null;
+  if (item.tags && item.tags.indexOf('保险箱') !== -1) _banTags = ['背包', '腰包', '胸包', '保险箱'];
+  C.assign(item._uid, {
+    w: w, h: h, grid: grid,
+    cellGroup: cellGroup,
+    connected: item.connected !== false,
+    _spaceId: 'cont_' + item._uid,
+    _banTags: _banTags
+  });
+}
+
+function renderContainerGridHTML(bagName, grid, w, h, cellGroup) {
+  var html = '';
+  html += '<div style="display:inline-grid;vertical-align:bottom;grid-template-columns:repeat(' + w + ',' + CELL_SIZE + 'px);grid-auto-rows:' + CELL_SIZE + 'px;gap:0;position:relative;;">';
+  for (var r = 0; r < h; r++) {
+    for (var c = 0; c < w; c++) {
+      var cellItem = grid[r][c];
+          html += _cellHTML(bagName, r, c, cellItem, h, w, cellGroup);
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
+function itemOpen() {
+  var item = null;
+  if (_sel) {
+    if (_sel.source === 'overview') {
+      item = ITEMS[_sel.idx];
+    } else if (_sel.source === 'equipped') {
+      item = E.get(_sel.slot);
+    } else if (_sel.source === 'weaponSlot') {
+      item = E.weapon[_sel.idx];
+    } else if (_sel.source === C.STASH) {
+      item = C.get(C.STASH).grid[_sel.row][_sel.col];
+    } else if (isBagSource(_sel.source)) {
+      var d = C.get(_sel.source);
+      if (d && d.grid) item = d.grid[_sel.row][_sel.col];
+    }
+  }
+  if (!item) return;
+  // 如果该容器已装备在装备栏中，禁用打开功能
+  if (item._uid) {
+    for (var _s in E._d) {
+      if (E.get(_s) && E.get(_s)._uid === item._uid) return;
+    }
+  }
+  var _wasOverview = (_sel && _sel.source === 'overview');
+  if (_wasOverview) {
+    // 总览模板：创建一次性预览浮窗
+    var w = 5, h = 3;
+    var emptyGrid = [];
+    for (var r = 0; r < h; r++) { emptyGrid[r] = []; for (var c = 0; c < w; c++) emptyGrid[r][c] = null; }
+    var ov = document.createElement('div');
+    ov.className = 'modal-overlay';
+    ov.style.cssText = 'display:flex;position:fixed;top:0;left:0;width:100%;height:100%;z-index:' + (++_topZ);
+    ov.onclick = null;
+    var bx = document.createElement('div');
+    bx.className = 'modal-box';
+    bx.style.cssText = 'max-width:500px;';
+    bx.innerHTML = '<div class="modal-header"><h3 style="margin:0;font-size:15px;font-weight:bold;color:#fff;">' + item.name + ' - 内部</h3><button onclick="this.closest(\'.modal-overlay\').remove()" style="background:none;border:none;color:#888;cursor:pointer;font-size:16px;line-height:1;">✕</button></div>'
+      + '<div style="min-height:60px;font-size:12px;color:#ccc;"><div style="color:#aaa;margin-bottom:6px;">容量 ' + (w * h) + '，装备后可用</div>'
+      + renderContainerGridHTML('backpack', emptyGrid, w, h) + '</div>';
+    ov.appendChild(bx);
+    document.body.appendChild(ov);
+    positionModalAtCursor(bx);
+    return;
+  }
+
+  // 实体容器：创建持久浮窗
+  if (!item._uid || !C.exists(item._uid)) initContainerGrid(item);
+  for (var _ci = 0; _ci < _openContainerModals.length; _ci++) {
+    if (_openContainerModals[_ci].item._uid === item._uid) {
+      _openContainerModals[_ci].overlay.style.zIndex = ++_topZ;
+      return;
+    }
+  }
+  var sp = C.get(item._uid);
+  var bagName = '_cont_' + item._uid;
+  C.assign(bagName, sp);
+
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.style.cssText = 'display:flex;position:fixed;top:0;left:0;width:100%;height:100%;z-index:' + (++_topZ);
+  
+
+  var box = document.createElement('div');
+  box.className = 'modal-box';
+  box.style.cssText = 'max-width:500px;';
+
+  var header = document.createElement('div');
+  header.className = 'modal-header';
+  var title = document.createElement('h3');
+  title.style.cssText = 'margin:0;font-size:15px;font-weight:bold;color:#fff;';
+  title.textContent = item.name + ' - 内部';
+  var closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'background:none;border:none;color:#888;cursor:pointer;font-size:16px;line-height:1;';
+  closeBtn.textContent = '✕';
+  closeBtn.onclick = function() { closeContainerModal(overlay); };
+  header.appendChild(title);
+  header.appendChild(closeBtn);
+
+  var contentDiv = document.createElement('div');
+  contentDiv.style.cssText = 'min-height:60px;font-size:12px;color:#ccc;';
+
+  box.appendChild(header);
+  box.appendChild(contentDiv);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  contentDiv.innerHTML = ""; renderContainerGrid(bagName, contentDiv, { cellGroup: sp.cellGroup });
+  _openContainerModals.push({ overlay: overlay, item: item, bagName: bagName, contentDiv: contentDiv });
+  positionModalAtCursor(box);
+}
+
+function closeContainerModal(overlay) {
+  if (!overlay) {
+    // 未指定参数：关闭全部
+    for (var i = _openContainerModals.length - 1; i >= 0; i--) {
+      var m = _openContainerModals[i];
+      if (m.item._uid) C.delete('_cont_' + m.item._uid);
+      m.overlay.remove();
+    }
+    _openContainerModals = [];
+    return;
+  }
+  for (var i = 0; i < _openContainerModals.length; i++) {
+    if (_openContainerModals[i].overlay === overlay) {
+      if (_openContainerModals[i].item._uid) C.delete('_cont_' + _openContainerModals[i].item._uid);
+      overlay.remove();
+      _openContainerModals.splice(i, 1);
+      break;
+    }
+  }
+}
+
+// === 物品总览 ===
+function showItemOverview() {
+  var container = document.getElementById('overviewContent');
+  var html = '<div style="margin-bottom:10px;">';
+  for (var i = 0; i < ITEMS.length; i++) {
+    var item = ITEMS[i];
+    html += '<div oncontextmenu="showOverviewItemModal(' + i + ');return false;" style="background:#252525;;padding:4px 8px;margin-bottom:2px;font-size:12px;cursor:pointer;">';
+    html += '<span style="color:#fff;">' + item.name + '</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+  container.innerHTML = html;
+  document.getElementById('itemOverviewModal').style.zIndex = ++_topZ; document.getElementById('itemOverviewModal').style.display = 'flex';
+  positionModalAtCursor(document.querySelector('#itemOverviewModal .modal-box'));
+}
+
+function closeOverviewModal() {
+  var box = document.querySelector('#itemOverviewModal .modal-box');
+  if (box) {
+    box.style.position = '';
+    box.style.left = '';
+    box.style.top = '';
+    box.style.margin = '';
+  }
+  document.getElementById('itemOverviewModal').style.display = 'none';
+}
+
+// === 船舱系统 ===
+
+// === 地牢系统 ===
+// === 地图 / 远征系统 ===
+// ===== 地牢/远征 =====
+var MAPS = {
+  coast: { name: '海岸', actionTime: 100, cols: 50, rows: 100 },
+};
+
+function renderMapSelect() {
+  document.getElementById('mapSelect').style.display = '';
+  document.getElementById('expeditionView').style.display = 'none';
+  var list = document.getElementById('mapList');
+  var html = '';
+  for (var key in MAPS) {
+    var m = MAPS[key];
+    html += '<div onclick="confirmEnterMap(\'' + key + '\')" style="background:#252525;border:1px solid #3a3a3a;;padding:16px;margin-bottom:8px;cursor:pointer;">';
+    html += '<div style="font-size:16px;font-weight:bold;color:#e94560;">' + m.name + '</div>';
+    html += '<div style="color:#888;font-size:12px;margin-top:4px;">行动时间：' + m.actionTime + ' | 区块：' + (m.cols * m.rows) + '</div>';
+    html += '</div>';
+  }
+  list.innerHTML = html;
+}
+
+function showConfirmModal(text, onConfirm, onDelete) {
+  var m = document.getElementById('confirmModal');
+  document.getElementById('confirmText').textContent = text;
+  document.getElementById('confirmOkBtn').onclick = function() {
+    closeConfirmModal();
+    if (onConfirm) onConfirm();
+  };
+  var delBtn = document.getElementById('confirmDelBtn');
+  if (onDelete) {
+    delBtn.style.display = '';
+    delBtn.onclick = function() {
+      closeConfirmModal();
+      if (onDelete) onDelete();
+    };
+  } else {
+    delBtn.style.display = 'none';
+  }
+  m.style.display = 'flex';
+  m.style.alignItems = 'center';
+  m.style.justifyContent = 'center';
+  m.style.pointerEvents = 'auto';
+}
+
+function closeConfirmModal() {
+  var m = document.getElementById('confirmModal');
+  m.style.display = 'none';
+  m.style.pointerEvents = '';
+}
+
+function confirmEnterMap(key) {
+  showConfirmModal('确定要进入此地图开始远征吗？', function() { enterMap(key); });
+}
+
+function enterMap(key) {
+  var m = MAPS[key];
+  if (!m) return;
+  G._currentMap = key;
+  G._actionTime = m.actionTime;
+  G._cols = m.cols;
+  G._rows = m.rows;
+  G._playerCol = 0;
+  G._playerRow = 0;
+  // 生成网格
+  G._grid = [];
+  for (var r = 0; r < m.rows; r++) {
+    G._grid[r] = [];
+    for (var c = 0; c < m.cols; c++) {
+      G._grid[r][c] = { explored: false };
+    }
+  }
+  // 玩家出生在地图最外一圈的随机位置
+  var spawnEdge = Math.floor(Math.random() * 4);
+  var spawnRow, spawnCol;
+  if (spawnEdge === 0) { spawnRow = 0; spawnCol = Math.floor(Math.random() * m.cols); }
+  else if (spawnEdge === 1) { spawnRow = m.rows - 1; spawnCol = Math.floor(Math.random() * m.cols); }
+  else if (spawnEdge === 2) { spawnRow = Math.floor(Math.random() * m.rows); spawnCol = 0; }
+  else { spawnRow = Math.floor(Math.random() * m.rows); spawnCol = m.cols - 1; }
+  G._playerRow = spawnRow;
+  G._playerCol = spawnCol;
+  G._grid[spawnRow][spawnCol] = { explored: true };
+  // 撤离点为离出生点最远的两个角落
+  var corners = [
+    { row: 0, col: 0 },
+    { row: 0, col: m.cols - 1 },
+    { row: m.rows - 1, col: 0 },
+    { row: m.rows - 1, col: m.cols - 1 }
+  ];
+  corners.sort(function(a, b) {
+    var da = Math.abs(a.row - spawnRow) + Math.abs(a.col - spawnCol);
+    var db = Math.abs(b.row - spawnRow) + Math.abs(b.col - spawnCol);
+    return db - da;
+  });
+  // 在最近的两个最远角落附近设撤离点
+  for (var ei = 0; ei < 2; ei++) {
+    var er = Math.min(m.rows - 1, Math.max(0, corners[ei].row + (corners[ei].row === 0 ? Math.floor(Math.random() * 4) : -Math.floor(Math.random() * 4))));
+    var ec = Math.min(m.cols - 1, Math.max(0, corners[ei].col + (corners[ei].col === 0 ? Math.floor(Math.random() * 4) : -Math.floor(Math.random() * 4))));
+    if (er !== spawnRow || ec !== spawnCol) {
+      G._grid[er][ec].type = 'extract';
+    }
+  }
+  renderExpedition();
+}
+
+function renderExpedition() {
+  // 远征中锁定装备/储藏箱/商人导航
+  document.getElementById('navEquip').classList.add('disabled');
+  document.getElementById('navTrader').classList.add('disabled');
+  document.getElementById('mapSelect').style.display = 'none';
+  document.getElementById('expeditionView').style.display = '';
+  var m = MAPS[G._currentMap];
+  document.getElementById('dTitle').textContent = m.name;
+  updateActionTimeDisplay();
+  renderGrid();
+  document.getElementById('dDesc').textContent = '';
+  document.getElementById('dLog').textContent = '';
+  updateChoices();
+}
+
+function updateActionTimeDisplay() {
+  document.getElementById('actionTimeDisplay').textContent = G._actionTime;
+}
+
+function renderDungeonGrid() {
+  var grid = document.getElementById('roomGrid');
+  if (!grid) return;
+  // 坐标显示
+  document.getElementById('coordDisplay').textContent = '当前位置：' + String.fromCharCode(65 + G._playerCol) + (G._playerRow + 1);
+  // 列标签行
+  var html = '<div style="display:inline-flex;flex-direction:column;gap:1px;">';
+  // 表头（列字母）
+  html += '<div style="display:flex;gap:1px;margin-left:30px;">';
+  for (var c = 0; c < G._cols; c++) {
+    html += '<div style="width:32px;text-align:center;font-size:8px;color:#555;">' + String.fromCharCode(65 + c) + '</div>';
+  }
+  html += '</div>';
+  // 行
+  for (var r = 0; r < G._rows; r++) {
+    // 行号
+    html += '<div style="display:flex;gap:1px;align-items:center;">';
+    html += '<div style="width:28px;text-align:center;font-size:8px;color:#555;">' + (r + 1) + '</div>';
+    for (var c = 0; c < G._cols; c++) {
+      var cell = G._grid[r][c];
+      var isPlayer = (r === G._playerRow && c === G._playerCol);
+      var isExtract = cell.type === 'extract';
+      var canMove = false;
+      var bg = '#111';
+      var border = '1px solid #222';
+      if (isPlayer) {
+        bg = '#4ecca3';
+        border = '1px solid #4ecca3';
+      } else if (isAdjacentToPlayer(r, c) && G._actionTime > 0) {
+        canMove = true;
+        if (isExtract) { bg = '#2a2a00'; border = '1px solid #e94560'; }
+        else if (cell.explored) { bg = '#252525'; border = '1px solid #4ecca3'; }
+        else { bg = '#0a0a1e'; border = '1px solid #0f3460'; }
+      } else {
+        if (isExtract) { bg = '#2a2a00'; border = '1px solid #e94560'; }
+        else if (cell.explored) { bg = '#252525'; border = '1px solid #333'; }
+        else { bg = '#111'; border = '1px solid #222'; }
+      }
+      var marker = '';
+      if (isPlayer) marker = 'P';
+      else if (isExtract) marker = 'E';
+      html += '<div onclick="' + (canMove ? 'moveTo(' + c + ',' + r + ')' : '') + '" style="width:var(--cell-size);height:var(--cell-size);background:' + bg + ';border:' + border + ';;cursor:' + (canMove ? 'pointer' : 'default') + ';display:flex;align-items:center;justify-content:center;font-size:10px;color:' + (isPlayer ? '#000' : (isExtract ? '#e94560' : 'transparent')) + ';font-weight:bold;">' + marker + '</div>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  // 图例
+  html += '<div style="display:flex;gap:10px;margin-top:6px;font-size:10px;color:#888;justify-content:center;">';
+  html += '<span><span style="display:inline-block;width:10px;height:10px;background:#4ecca3;;vertical-align:middle;"></span> 玩家</span>';
+  html += '<span><span style="display:inline-block;width:10px;height:10px;background:#2a2a00;border:1px solid #e94560;;vertical-align:middle;"></span> 撤离点</span>';
+  html += '<span><span style="display:inline-block;width:10px;height:10px;background:#0a0a1e;border:1px solid #0f3460;;vertical-align:middle;"></span> 可移动</span>';
+  html += '<span><span style="display:inline-block;width:10px;height:10px;background:#111;border:1px solid #222;;vertical-align:middle;"></span> 未探索</span>';
+  html += '</div>';
+  grid.innerHTML = html;
+}
+
+function isAdjacentToPlayer(r, c) {
+  var dr = Math.abs(r - G._playerRow);
+  var dc = Math.abs(c - G._playerCol);
+  return dr <= 1 && dc <= 1 && (dr + dc > 0);
+}
+
+function moveTo(col, row) {
+  if (!isAdjacentToPlayer(row, col)) return;
+  if (G._actionTime <= 0) return;
+  G._actionTime -= 1;
+  G._playerCol = col;
+  G._playerRow = row;
+  var cell = G._grid[row][col];
+  cell.explored = true;
+  updateActionTimeDisplay();
+
+  if (cell.type === 'extract') {
+    extract();
+    return;
+  }
+
+  var log = '移动到 ' + String.fromCharCode(65 + col) + (row + 1);
+  document.getElementById('dLog').textContent = log;
+  renderGrid();
+
+  if (G._actionTime <= 0) {
+    lostInMap();
+  }
+}
+
+function extract() {
+  document.getElementById('dLog').textContent = '你成功撤离了海岸！';
+  document.getElementById('dChoices').innerHTML = '<button class="pri" onclick="leaveMap()">返回营地</button>';
+  document.getElementById('dDesc').textContent = '撤离成功';
+}
+
+function loseAllItems() {
+  // 遍历所有空间，清空未标记为不丢失的物品
+  C.each(function(k, sp) {
+    if (sp._noLose) return;
+    if (!sp.grid) return;
+    for (var r = 0; r < sp.grid.length; r++) {
+      for (var c = 0; c < (sp.grid[r] ? sp.grid[r].length : 0); c++) {
+        sp.grid[r][c] = null;
+      }
+    }
+  });
+  // 清空装备栏（排除受保护的栏位），清理容器空间和关联背包
+  for (var slot in E._d) {
+    var _protectedSlot = false;
+    for (var _ui = 0; _ui < SLOT_DEFS.length; _ui++) { if (SLOT_DEFS[_ui].key === slot && SLOT_DEFS[_ui]._protected) { _protectedSlot = true; break; } }
+    if (_protectedSlot) continue;
+    var item = E.get(slot);
+    if (item && item._uid) {
+      C.delete(item._uid);
+      C.delete('_cont_' + item._uid);
+    }
+    E.clear(slot);
+  }
+  E.clearWeapons();
+  E.sidearm = [];
+}
+
+function lostInMap() {
+  loseAllItems();
+  document.getElementById('dLog').textContent = '行动时间耗尽！你迷失了...\n丢失了装备和背包中的物品。';
+  document.getElementById('dChoices').innerHTML = '<button class="pri" onclick="leaveMap()">返回营地</button>';
+  document.getElementById('dDesc').textContent = '迷失';
+}
+
+function leaveMap() {
+  delete G._currentMap;
+  delete G._actionTime;
+  delete G._cols;
+  delete G._rows;
+  delete G._playerCol;
+  delete G._playerRow;
+  delete G._grid;
+  delete G._extractPos;
+  document.getElementById('navEquip').classList.remove('disabled');
+  document.getElementById('navTrader').classList.remove('disabled');
+  renderMapSelect();
+  renderAll();
+}
+
+function updateChoices() {
+  if (document.getElementById('dChoices').innerHTML) return;
+  document.getElementById('dChoices').innerHTML = '<button onclick="confirmAbandon()" style="color:#888;">放弃远征</button>';
+}
+
+function confirmAbandon() {
+  showConfirmModal('放弃远征将失去身上所有物品，确定吗？', function() {
+    loseAllItems();
+    leaveMap();
+  });
+}
+
+// ===== 存档系统（10栏位） =====
+var _saveMode = false, _selectedSlot = -1;
+var SAVE_KEYS = [];
+for (var _si = 0; _si < 10; _si++) SAVE_KEYS.push('dungeon_save_' + _si);
+
+function getSlotInfo(idx) {
+  var raw = localStorage.getItem(SAVE_KEYS[idx]);
+  if (!raw) return null;
+  try { var d = JSON.parse(raw); return { time: d._savetime || 0, label: new Date(d._savetime || Date.now()).toLocaleString() }; }
+  catch(e) { return null; }
+}
+
+function renderSave() {
+  var info = document.getElementById('saveInfo');
+  var slots = document.getElementById('saveSlots');
+  if (!info || !slots) return;
+  info.textContent = _saveMode ? '点击右侧栏位保存' : (_selectedSlot >= 0 ? '已选中栏位' + (_selectedSlot+1) : '');
+  info.className = 'msg ' + (_saveMode || _selectedSlot >= 0 ? 'suc' : 'info');
+  var btn = document.getElementById('saveBtn');
+  if (btn) btn.textContent = _saveMode ? '取消保存' : '保存游戏';
+
+  slots.innerHTML = '';
+  for (var i = 0; i < 10; i++) {
+    var sd = getSlotInfo(i);
+    var div = document.createElement('div');
+    var sel = i === _selectedSlot;
+    div.style.cssText = 'width:100%;height:36px;cursor:pointer;display:flex;align-items:center;padding:0 12px;font-size:12px;border:2px solid ' + (sel ? '#4ecca3' : sd ? '#555' : '#333') + ';background:' + (sel ? '#1a3a2e' : sd ? '#2a2a3a' : '#1a1a1a') + ';';
+    if (sd) {
+      div.innerHTML = '<span style="color:#aaa;flex:none;width:60px;">栏位' + (i+1) + '</span><span style="color:#888;font-size:10px;">' + sd.label + '</span>';
+    } else {
+      div.innerHTML = '<span style="color:#555;flex:none;width:60px;">栏位' + (i+1) + '</span><span style="color:#444;font-size:10px;">空</span>';
+    }
+    div.onclick = function(idx) { return function() { onSlotClick(idx); }; }(i);
+    slots.appendChild(div);
+  }
+}
+
+function toggleSaveMode() {
+  _saveMode = !_saveMode;
+  _selectedSlot = -1;
+  renderSave();
+}
+
+function onSlotClick(idx) {
+  if (_saveMode) {
+    G._savetime = Date.now();
+    localStorage.setItem(SAVE_KEYS[idx], JSON.stringify(G));
+    _saveMode = false;
+    _selectedSlot = -1;
+    renderSave();
+    showMsg('已保存到栏位 ' + (idx+1), 'suc');
+    return;
+  }
+  _selectedSlot = idx;
+  renderSave();
+}
+
+function doLoad() {
+  if (_selectedSlot < 0) { showMsg('请先选中一个存档栏位', 'info'); return; }
+  doLoadIdx(_selectedSlot);
+  _selectedSlot = -1;
+}
+
+function doDelete() {
+  if (_selectedSlot < 0) { showMsg('请先选中一个存档栏位', 'info'); return; }
+  var sd = getSlotInfo(_selectedSlot);
+  if (!sd) { showMsg('该栏位为空', 'info'); return; }
+  showConfirmModal('确定删除栏位 ' + (_selectedSlot+1) + ' 的存档？', function() {
+    localStorage.removeItem(SAVE_KEYS[_selectedSlot]);
+    _selectedSlot = -1;
+    renderSave();
+    showMsg('存档已删除', 'info');
+  });
+}
+
+function doLoadIdx(idx) {
+  var raw = localStorage.getItem(SAVE_KEYS[idx]);
+  if (!raw) { showMsg('该栏位为空', 'info'); return; }
+  Object.assign(G, JSON.parse(raw));
+  E._d = G.equipped; E.weapon = G.weaponSlots; E.sidearm = G.sidearmSlots; C._d = G._containerSpaces;
+  migrateLimbs();
+  migrateSave();
+  normalizeBags();
+  renderAll();
+  _saveMode = false;
+  showMsg('已读取栏位 ' + (idx+1), 'suc');
+}
+
+function normalizeBags() {
+  // 收集所有当前背包中的物品（兼容旧格式）
+  var items = [];
+  C.bagOrder.forEach(function(b) {
+    var bag = C.get(b);
+    if (!bag) return;
+    if (bag.grid) {
+      bag.grid.forEach(function(row) { row.forEach(function(cell) { if (cell && !cell._occ) items.push(cell); }); });
+    } else if (Array.isArray(bag)) {
+      items = items.concat(bag);
+    }
+  });
+  // 保存储藏箱网格
+  var stashBackup = C.get(C.STASH) ? JSON.parse(JSON.stringify(C.get(C.STASH))) : null;
+  // 旧格式迁移：G.stash 数组 → C.get(C.STASH) 网格
+  if (!stashBackup && Array.isArray(G.stash)) {
+    var g = []; for (var r = 0; r < 20; r++) { g[r] = []; for (var c = 0; c < 20; c++) g[r][c] = null; }
+    stashBackup = { w: 20, h: 20, connected: true, grid: g };
+    G.stash.forEach(function(item) {
+      if (!item) return;
+      var sz = getItemSize(item);
+      for (var r = 0; r <= 20 - sz.h && sz.w <= 20; r++) {
+        for (var c = 0; c <= 20 - sz.w; c++) {
+          var ok = true;
+          for (var dr = 0; dr < sz.h && ok; dr++) {
+            for (var dc = 0; dc < sz.w && ok; dc++) {
+              if (g[r + dr][c + dc] !== null) ok = false;
+            }
+          }
+          if (ok) {
+            g[r][c] = Object.assign({}, item);
+            for (var dr = 0; dr < sz.h; dr++) {
+              for (var dc = 0; dc < sz.w; dc++) {
+                if (dr !== 0 || dc !== 0) g[r + dr][c + dc] = { _occ: true, _ar: r, _ac: c };
+              }
+            }
+            r = 999; break;
+          }
+        }
+      }
+    });
+  }
+  delete G.stash;
+  // 重置预定义空间（不影响动态 _cont_uid 等条目）
+  C._d.satchel = { w: 0, h: 0, connected: true, grid: [], _spaceId: 'satchel' };
+  C._d.waist = { w: 0, h: 0, connected: true, grid: [], _spaceId: 'waist' };
+  C._d.backpack = { w: 0, h: 0, connected: true, grid: [], _spaceId: 'backpack' };
+  C._d.safe = { w: 0, h: 0, connected: true, grid: [], _spaceId: 'safe' };
+  // 恢复储藏箱
+  if (stashBackup) C._d.stash = stashBackup;
+  // 重新放入物品
+  items.forEach(function(item) {
+    // 迁移旧格式 size → x/y
+    if (item.size && (item.x == null || item.y == null)) {
+      item.x = item.size.w;
+      item.y = item.size.h;
+      delete item.size;
+    }
+    var sz = getItemSize(item);
+    for (var bi = 0; bi < ['pockets','satchel','waist','backpack','safe'].length; bi++) {
+      var bn = ['pockets','satchel','waist','backpack','safe'][bi];
+      var data = C.get(bn);
+      if (data && data.connected === false && (sz.w > 1 || sz.h > 1)) continue;
+      for (var r = 0; r <= data.grid.length - sz.h; r++) {
+        for (var c = 0; c <= data.grid[r].length - sz.w; c++) {
+          var ok = true;
+          var baseGroup = null;
+          for (var dr = 0; dr < sz.h && ok; dr++) {
+            for (var dc = 0; dc < sz.w && ok; dc++) {
+              var thisGroup = getCellGroup(bn, r + dr, c + dc);
+              if (baseGroup === null) baseGroup = thisGroup;
+              if (data.grid[r + dr][c + dc] !== null) ok = false;
+              if (thisGroup === null || thisGroup !== baseGroup) ok = false;
+            }
+          }
+          if (ok) {
+            placeItem(bn, item, r, c);
+            r = 999; bi = 999; break;
+          }
+        }
+      }
+    }
+  });
+}
+
+// ========== 存档版本迁移系统 ==========
+const SAVE_VERSION = 3;
+const SAVE_MIGRATIONS = {
+  // v1：保险箱容器空间添加 _banTags
+  1: function() {
+    for (var _sBag in C._d) {
+      var _sGd = C.grid(_sBag);
+      if (!_sGd) continue;
+      for (var _sR = 0; _sR < _sGd.length; _sR++) {
+        for (var _sC = 0; _sC < (_sGd[_sR]||[]).length; _sC++) {
+          var _sIt = _sGd[_sR][_sC];
+          if (_sIt && !_sIt._occ && _sIt._uid && hasTag(_sIt, '保险箱')) {
+            var _sSp = C.get(_sIt._uid);
+            if (_sSp) _sSp._banTags = ['背包', '腰包', '胸包', '保险箱'];
+          }
+        }
+      }
+    }
+  },
+  // v2：保险箱 ban 列表追加【保险箱】tag（禁止保险箱套保险箱）
+  2: function() {
+    for (var _sBag in C._d) {
+      var _sGd = C.grid(_sBag);
+      if (!_sGd) continue;
+      for (var _sR = 0; _sR < _sGd.length; _sR++) {
+        for (var _sC = 0; _sC < (_sGd[_sR]||[]).length; _sC++) {
+          var _sIt = _sGd[_sR][_sC];
+          if (_sIt && !_sIt._occ && _sIt._uid && hasTag(_sIt, '保险箱')) {
+            var _sSp = C.get(_sIt._uid);
+            if (_sSp) _sSp._banTags = ['背包', '腰包', '胸包', '保险箱'];
+          }
+        }
+      }
+    }
+  },
+  // v3：旧存档的 G.bags → G._containerSpaces（网格统一重构后不再有 G.bags）
+  3: function() {
+    if (!G.bags || typeof G.bags !== 'object') return;
+    var _spKeys = ['pockets','satchel','waist','backpack','safe','stash'];
+    for (var _bi = 0; _bi < _spKeys.length; _bi++) {
+      var _k = _spKeys[_bi];
+      if (G.bags[_k]) {
+        C.assign(_k, G.bags[_k]);
+      }
+    }
+    delete G.bags;
+  }
+};
+function migrateSave() {
+  var ver = G._saveVersion || 0;
+  if (ver >= SAVE_VERSION) return;
+  for (var v = ver + 1; v <= SAVE_VERSION; v++) {
+    if (SAVE_MIGRATIONS[v]) SAVE_MIGRATIONS[v]();
+  }
+  G._saveVersion = SAVE_VERSION;
+}
+
+// 迁移旧版肢体数据到新版
+function migrateLimbs() {
+  var defaultLimbs = { head:{hp:50,max:50}, neck:{hp:30,max:30}, chest:{hp:70,max:70}, abdomen:{hp:70,max:70}, leftHand:{hp:50,max:50}, rightHand:{hp:50,max:50}, leftLeg:{hp:50,max:50}, rightLeg:{hp:50,max:50} };
+  G.limbs = G.limbs || {};
+  delete G.limbs.hands;
+  delete G.limbs.legs;
+  for (var key in defaultLimbs) {
+    if (!G.limbs[key]) G.limbs[key] = { hp: defaultLimbs[key].hp, max: defaultLimbs[key].max };
+  }
+}
+
+// 启动：尝试从旧版或第一个有效栏位读档
+(function _startup() {
+  var _old = localStorage.getItem('dungeon_save');
+  if (_old) {
+    Object.assign(G, JSON.parse(_old));
+    E._d = G.equipped; E.weapon = G.weaponSlots; E.sidearm = G.sidearmSlots; C._d = G._containerSpaces;
+    localStorage.setItem(SAVE_KEYS[0], _old);
+    localStorage.removeItem('dungeon_save');
+    migrateLimbs();
+    migrateSave();
+    normalizeBags();
+    renderAll();
+    showScreen('dungeon');
+    return;
+  }
+  for (var _i = 0; _i < 10; _i++) {
+    var _r = localStorage.getItem(SAVE_KEYS[_i]);
+    if (_r) {
+      Object.assign(G, JSON.parse(_r));
+      E._d = G.equipped; E.weapon = G.weaponSlots; E.sidearm = G.sidearmSlots; C._d = G._containerSpaces;
+      migrateLimbs();
+      migrateSave();
+      normalizeBags();
+      renderAll();
+      showScreen('dungeon');
+      return;
+    }
+  }
+  renderAll();
+  showScreen('dungeon');
+})();
+
+// 初始化默认物品（无对应物品时创建）
+(function initDefaultSpaces() {
+  function _initBag(itemId, bagKey, equipSlot) {
+    if (C.get(bagKey)) return; // 已有空间（来自存档或已装备）
+    for (var _ti = 0; _ti < ITEMS.length; _ti++) { if (ITEMS[_ti].id === itemId) { var _t = ITEMS[_ti]; break; } }
+    if (!_t) return;
+    var _it = Object.assign({}, _t);
+    assignItemId(_it);
+    if (!C.exists(_it._uid)) initContainerGrid(_it);
+    if (equipSlot) E.set(equipSlot, _it);
+    C.assign(bagKey, C.get(_it._uid));
+  }
+  // 默认储藏箱
+  if (!E.get('camp_stash')) {
+    var _oldStash = C.get(C.STASH);
+    if (_oldStash && _oldStash.grid) {
+      // 已有存档数据：创建默认物品并指向已有空间
+      for (var _ti = 0; _ti < ITEMS.length; _ti++) { if (ITEMS[_ti].id === 'stash_default') { var _t = ITEMS[_ti]; break; } }
+      if (_t) {
+        var _it = Object.assign({}, _t);
+        assignItemId(_it);
+        C.assign(_it._uid, _oldStash);
+        C.assign(C.STASH, _oldStash);
+        E.set('camp_stash', _it);
+      }
+    } else {
+      // 无旧数据：创建新物品
+      _initBag('stash_default', C.STASH, 'camp_stash');
+    }
+  }
+  // 重新钉住所有已装备容器物品的空间
+  for (var _ss in E._d) {
+    var _si = E.get(_ss);
+    if (_si && _si._uid && C.exists(_si._uid)) C.assign(_ss, C.get(_si._uid));
+  }
+})();
+syncCellSize();
+window.addEventListener('resize', syncCellSize);
+
+// === 自定义拖拽系统（替代原生 HTML5 DnD） ===
+var _isDragging = false, _dragPotential = false, _dragStartX = 0, _dragStartY = 0, _dragStartTarget = null, _dragPotentialSrc = null, _dragSourceEls = [], _dragOrigGrabOffset = null;
+
+function _clearDragHL() {
+  document.querySelectorAll('.drag-invalid').forEach(function(el) { el.classList.remove('drag-invalid'); });
+  if (_dragHL && _dragHL.length) {
+    _dragHL.forEach(function(h) {
+      document.querySelectorAll('.screen.active [data-drop="bag"][data-bag="' + h.bag + '"][data-row="' + h.row + '"][data-col="' + h.col + '"]').forEach(function(cell) { cell.classList.remove('drag-over'); });
+    });
+    document.querySelectorAll('[data-overlay-for].drag-over').forEach(function(el) { el.classList.remove('drag-over'); });
+    _dragHL = [];
+  }
+  if (_dragL11 && _dragL11.length) {
+    _dragL11.forEach(function(el) { el.style.display = 'none'; });
+  }
+  if (_dragL13 && _dragL13.length) {
+    _dragL13.forEach(function(el) { if (el.parentNode) el.parentNode.removeChild(el); }); _dragL13 = [];
+  }
+
+}
+function dragRotate() {
+    if (!_dragOrigSize) return;
+    _dragRotated = !_dragRotated;
+    _dragSize = _dragRotated
+      ? {w: _dragOrigSize.h, h: _dragOrigSize.w}
+      : {w: _dragOrigSize.w, h: _dragOrigSize.h};
+    // 以当前鼠标所在格为轴心旋转，始终从原始偏移计算（不累积）
+    _clearDragHL();
+    if (_dragOrigGrabOffset) {
+      var _gr = _dragOrigGrabOffset.dr, _gc = _dragOrigGrabOffset.dc;
+      if (_dragRotated) {
+        // 顺时针90°：(r,c) → (c, h-1-r)
+        _dragGrabOffset = {dr: _gc, dc: (_dragOrigSize.h - 1) - _gr};
+      } else {
+        _dragGrabOffset = {dr: _gr, dc: _gc};
+      }
+    }
+    _refreshDragHL();
+  }
+
+function _refreshDragHL() {
+    if (_lastMX <= 0 || _lastMY <= 0) return;
+    var _t = document.elementFromPoint(_lastMX, _lastMY);
+    if (!_t) return;
+    var _e = _t.closest('[data-drop="bag"]');
+    if (!_e) return;
+    var _db = _e.getAttribute('data-bag');
+    var _dr = parseInt(_e.getAttribute('data-row'));
+    var _dc = parseInt(_e.getAttribute('data-col'));
+    var _sz = _dragSize, _bagD = C.get(_db);
+    if (_bagD && _bagD.connected === false && (_sz.w > 1 || _sz.h > 1)) return;
+    var _ar = _dr - Math.floor(_sz.h / 2);
+    var _ac = _dc - Math.floor(_sz.w / 2);
+    // 分区一致性检查
+    var _bg = null, _cross = false;
+    for (var _r = 0; _r < _sz.h && !_cross; _r++) for (var _c = 0; _c < _sz.w && !_cross; _c++) {
+      var _tr = _ar + _r, _tc = _ac + _c;
+      if (_dragSrc && _dragSrc.src === 'bag' && _db === _dragSrc.bag && _tr >= _dragSrc.row && _tr < _dragSrc.row + _dragOrigSize.h && _tc >= _dragSrc.col && _tc < _dragSrc.col + _dragOrigSize.w) continue;
+      var _g = getCellGroup(_db, _tr, _tc);
+      if (_g === null) _cross = true;
+      else if (_bg === null) _bg = _g;
+      else if (_g !== _bg) _cross = true;
+    }
+    if (_cross) {
+      for (var _r = 0; _r < _sz.h; _r++) for (var _c = 0; _c < _sz.w; _c++) {
+        document.querySelectorAll('.screen.active [data-drop="bag"][data-bag="' + _db + '"][data-row="' + (_ar + _r) + '"][data-col="' + (_ac + _c) + '"]').forEach(function(cell) { cell.classList.add('drag-invalid'); });
+      }
+    } else {
+      var _allG = true;
+      for (var _r = 0; _r < _sz.h; _r++) for (var _c = 0; _c < _sz.w; _c++) {
+        var _tr = _ar + _r, _tc = _ac + _c;
+        if (_dragSrc && _dragSrc.src === 'bag' && _db === _dragSrc.bag && _tr >= _dragSrc.row && _tr < _dragSrc.row + _dragOrigSize.h && _tc >= _dragSrc.col && _tc < _dragSrc.col + _dragOrigSize.w) {
+          document.querySelectorAll('.screen.active [data-drop="bag"][data-bag="' + _db + '"][data-row="' + _tr + '"][data-col="' + _tc + '"]').forEach(function(cell) { cell.classList.add('drag-over'); _dragHL.push({bag:_db, row:_tr, col:_tc}); });
+          continue;
+        }
+        var _cD = C.getCell(_db, _tr, _tc);
+        if (_cD !== null && _cD !== undefined) {
+          var _canS = _dragItem && _cD._qty != null && _cD.stack != null && _sz.w === 1 && _sz.h === 1 && _cD.id === _dragItem.id && _cD._qty < _cD.stack;
+          if (!_canS) { _allG = false; document.querySelectorAll('.screen.active [data-drop="bag"][data-bag="' + _db + '"][data-row="' + _tr + '"][data-col="' + _tc + '"]').forEach(function(cell) { cell.classList.add('drag-invalid'); }); continue; }
+        }
+        document.querySelectorAll('.screen.active [data-drop="bag"][data-bag="' + _db + '"][data-row="' + _tr + '"][data-col="' + _tc + '"]').forEach(function(cell) { cell.classList.add('drag-over'); _dragHL.push({bag:_db, row:_tr, col:_tc}); });
+      }
+      if (_allG) document.querySelectorAll('[data-overlay-for="' + _db + '-' + _ar + '-' + _ac + '"]').forEach(function(el) { el.classList.add('drag-over'); });
+    }
+  }
+
+// mousedown：记录潜在拖拽起点 + 选中
+document.addEventListener('mousedown', function(e) {
+  if (e.button !== 0) return;
+  if (e.target.closest('button, .mbtn, input, select, textarea')) return;
+  var el = e.target.closest('[data-drag]');
+  if (!el) return;
+  var d = el.getAttribute('data-drag');
+  if (!d) return;
+  // 选中反馈（按下时立即显示，不等 mouseup）
+  document.querySelectorAll('.l10').forEach(function(l){l.style.display='none';});
+  _selectedEl = null;
+  try {
+    var src = JSON.parse(d);
+    var overlay = null;
+    if (src.src === 'bag') {
+      var _active = document.querySelector('.screen.active');
+      if (_active) overlay = _active.querySelector('[data-overlay-for="' + src.bag + '-' + src.row + '-' + src.col + '"]');
+      if (!overlay) overlay = document.querySelector('[data-overlay-for="' + src.bag + '-' + src.row + '-' + src.col + '"]');
+    }
+    if(overlay){var s=overlay.querySelector('.l10');if(s)s.style.display='block';}
+    _selectedEl = overlay || el;
+  } catch(ee) {}
+  // 潜在拖拽
+  _dragPotential = true;
+  _dragStartX = e.clientX;
+  _dragStartY = e.clientY;
+  _dragStartTarget = el;
+  try { _dragPotentialSrc = JSON.parse(d); } catch(ee) { _dragPotential = false; }
+});
+
+// 阻止浏览器原生拖拽（否则 ghost image + 禁止符号）
+document.addEventListener('dragstart', function(e) { e.preventDefault(); });
+// 物品悬停高亮：鼠标移到任意格子显示该物品的 l7 层（整格覆盖）
+var _hoverKey = null;
+document.addEventListener('mouseover', function(e) {
+  var cell = e.target.closest('[data-drag]');
+  if (!cell) {
+    if (_hoverKey) { document.querySelectorAll('.l7').forEach(function(l){l.style.display='none';}); _hoverKey = null; }
+    return;
+  }
+  if (_isDragging) return;
+  try {
+    var src = JSON.parse(cell.getAttribute('data-drag'));
+    if (src.src === 'bag') {
+      var key = src.bag + '-' + src.row + '-' + src.col;
+      if (key === _hoverKey) return;
+      document.querySelectorAll('.l7').forEach(function(l){l.style.display='none';});
+      var ov = document.querySelector('[data-overlay-for="' + key + '"]');
+      if (ov) { var l7 = ov.querySelector('.l7'); if (l7) l7.style.display = 'block'; }
+      _hoverKey = key;
+    }
+  } catch(e) {}
+});
+
+function _startDrag(e, el, src) {
+  _dragItem = resolveDragItem(src);
+  _dragSrc = src;
+  _dragSize = src.w ? {w:src.w, h:src.h} : (_dragItem ? getItemSize(_dragItem) : {w:1,h:1});
+  _dragOrigSize = {w:_dragSize.w,h:_dragSize.h};
+  _dragRotated = false;
+  _dragHL = [];
+  _dragGrabOffset = null;
+  _lastSnapBag = null; _lastSnapRow = -1; _lastSnapCol = -1; _lastSnapItemR = 0; _lastSnapItemC = 0;
+  if (src.src === 'bag') {
+    var ge = el.closest('[data-drag]');
+    if (ge) { _dragGrabOffset = {dr: parseInt(ge.getAttribute('data-row')) - src.row, dc: parseInt(ge.getAttribute('data-col')) - src.col}; _dragOrigGrabOffset = {dr: _dragGrabOffset.dr, dc: _dragGrabOffset.dc}; }
+  }
+  // 叠加层
+  var _div = document.getElementById('dragOverlay');
+  if (!_div) {
+    _div = document.createElement('div');
+    _div.id = 'dragOverlay';
+    _div.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;display:none;opacity:0.85;';
+    var _inner = document.createElement('div');
+    _inner.className = 'dol-icon';
+    _div.appendChild(_inner);
+    document.body.appendChild(_div);
+  }
+  var _icon = _div.firstChild;
+  var _isz = _dragItem ? _getIconSize(_dragItem.id) : 48;
+  var _dsz = _calcIconDisp(_isz, Math.min(_dragSize.w, _dragSize.h) * CELL_SIZE);
+  _icon.style.cssText = 'width:'+_dsz+'px;height:'+_dsz+'px;background-size:100% 100%;background-repeat:no-repeat;background-position:center;image-rendering:pixelated;';
+  _icon.style.backgroundImage = _dragItem ? 'url(\'' + _getItemIconUrl(_dragItem.id) + '\')' : '';
+  _icon.style.transform = '';
+  _div.style.width = _dragSize.w * CELL_SIZE + 'px';
+  _div.style.height = _dragSize.h * CELL_SIZE + 'px';
+  _div.style.left = (e.clientX - _dragSize.w * HALF_CELL) + 'px';
+  _div.style.top = (e.clientY - _dragSize.h * HALF_CELL) + 'px';
+  _div.style.display = 'flex';
+  _div.style.alignItems = 'center';
+  _div.style.justifyContent = 'center';
+  _dragOverlay = _div;
+  // 拖拽开始，清除选中描边
+  document.querySelectorAll('.l10').forEach(function(l){l.style.display='none';}); _selectedEl = null;
+  _isDragging = true;
+  // 隐藏原位物品：只留全尺寸 overlay 半透明，格子背景图去掉但保留边框
+  _dragSourceEls = [];
+  if (src.src === 'bag') {
+    var _ovs = document.querySelectorAll('[data-overlay-for="' + src.bag + '-' + src.row + '-' + src.col + '"]');
+    if (_ovs.length) {
+      // 多格：只留像素图标和文字，隐藏底色和描边
+      _ovs.forEach(function(s) {
+        s._origBgColor = s.style.backgroundColor;
+        s.style.opacity = '0.3';
+        s.style.backgroundColor = 'transparent';
+        for (var _ci = 0; _ci < s.children.length; _ci++) {
+          var _ch = s.children[_ci];
+          if (_ch.style && _ch.style.outline && _ch.style.outline.indexOf('solid') > 0) { _ch.style.display = 'none'; _dragSourceEls.push(_ch); }
+        }
+        _dragSourceEls.push(s);
+      });
+      document.querySelectorAll('[data-drag]').forEach(function(s) {
+        var _sd = s.getAttribute('data-drag');
+        if (_sd && _sd.indexOf('"src":"bag","bag":"' + src.bag + '","row":' + src.row + ',"col":' + src.col) >= 0) {
+          s._origBg = s.style.backgroundImage;
+          s._origOutline = s.style.outline;
+          s.style.backgroundImage = 'none';
+          s.style.outline = 'none';
+          _dragSourceEls.push(s);
+        }
+      });
+    } else {
+      // 单格：格子+覆盖层半透明无描边
+      document.querySelectorAll('[data-drag]').forEach(function(s) {
+        var _sd = s.getAttribute('data-drag');
+        if (_sd && _sd.indexOf('"src":"bag","bag":"' + src.bag + '","row":' + src.row + ',"col":' + src.col) >= 0) {
+          s._origOutline = s.style.outline;
+          s.style.opacity = '0.3';
+          s.style.outline = 'none';
+          _dragSourceEls.push(s);
+          // 对应的覆盖层也半透明
+          var _ov = document.querySelectorAll('[data-overlay-for="' + src.bag + '-' + src.row + '-' + src.col + '"]');
+          _ov.forEach(function(o) { o.style.opacity = '0.3'; o.style.backgroundColor = 'transparent'; o.style.outline = 'none'; _dragSourceEls.push(o); });
+        }
+      });
+    }
+  }
+  if (src.src !== 'bag' && src.src) {
+    var _k = '"src":"' + src.src + '"';
+    if (src.src === 'equipped') _k += ',"slot":"' + src.slot + '"';
+    else if (src.src === 'weaponSlot' || src.src === 'sidearmSlot') _k += ',"idx":' + src.idx;
+    document.querySelectorAll('[data-drag]').forEach(function(s) {
+      if (s.getAttribute('data-drag').indexOf(_k) >= 0) {
+        s.style.opacity = '0.3';
+        _dragSourceEls.push(s);
+      }
+    });
+  }
+  // 高亮可装备栏位
+  if (_dragItem && hasTag(_dragItem, '可装备')) {
+    document.querySelectorAll('[data-drop="equip"]').forEach(function(slotEl) {
+      if (isValidEquip(slotEl.getAttribute('data-slot'), _dragItem)) slotEl.classList.add('drag-equip-valid');
+    });
+  }
+}
+
+// mousemove：启动拖拽 / 更新位置+高亮
+function _updateDropHL(cx, cy) {
+    if (!_isDragging) return;
+    _clearDragHL();
+  var target = document.elementFromPoint(cx, cy);
+  if (!target) return;
+  var el = target.closest('[data-drop]'); if (!el) return;
+  var dstType = el.getAttribute('data-drop');
+  if (dstType === 'equip' && _dragItem) {
+    var slot = el.getAttribute('data-slot');
+    if (!isValidEquip(slot, _dragItem)) { el.classList.add('drag-invalid'); return; }
+    el.classList.add('drag-over');
+  } else if (dstType === 'bodypart') {
+    if (_dragItem && hasTag(_dragItem, '医用品')) {
+      var bpKey = el.getAttribute('data-bodypart');
+      var limb = G.limbs[bpKey];
+      if (limb && limb.hp < limb.max) el.classList.add('drag-over');
+      else el.classList.add('drag-invalid');
+    }
+  } else if (dstType === 'buybox' && _dragSrc && _dragSrc.src === 'merchant') {
+    el.classList.add('drag-over');
+  } else if (dstType === 'bag') {
+    var db = el.getAttribute('data-bag');
+    var dr = parseInt(el.getAttribute('data-row'));
+    var dc = parseInt(el.getAttribute('data-col'));
+    var bagData = C.get(db);
+    var _banned = false;
+    if (bagData && bagData.connected === false && (_dragSize.w > 1 || _dragSize.h > 1)) { el.classList.add('drag-invalid'); _banned = true; }
+    var sz = _dragSize;
+    var _itemR, _itemC;
+    if (sz.h % 2) {
+      _itemR = dr - Math.floor(sz.h / 2);
+    } else {
+      var _rc = el.getBoundingClientRect();
+      _itemR = (cy - _rc.top < _rc.height / 2) ? dr - 1 : dr;
+    }
+    if (sz.w % 2) {
+      _itemC = dc - Math.floor(sz.w / 2);
+    } else {
+      var _rc = el.getBoundingClientRect();
+      _itemC = (cx - _rc.left < _rc.width / 2) ? dc - 1 : dc;
+    }
+    if (db.indexOf('_cont_') === 0 && _dragItem && _dragItem._uid) {
+      var contUid = parseInt(db.substring(6), 10);
+      if (_dragItem._uid === contUid || isItemInContainer(contUid, _dragItem._uid)) { el.classList.add('drag-invalid'); _banned = true; }
+    }
+    // ===== 先全部计算，再统一输出 =====
+    var _isContainer = false, _contR = 0, _contC = 0, _space = false, _needRot = false;
+    // 计算：ban（背包级别）
+    if (_dragItem && _dragItem.tags) {
+      var _bagData = C.get(db);
+      if (_bagData && _bagData._banTags) {
+        for (var _bt = 0; _bt < _bagData._banTags.length; _bt++) {
+          if (hasTag(_dragItem, _bagData._banTags[_bt])) { _banned = true; break; }
+        }
+      }
+    }
+    // 计算：容器检测
+    if (_dragItem) {
+      var _tgtC = C.getCell(db, dr, dc);
+      _contR = dr; _contC = dc;
+      if (_tgtC && _tgtC._occ) { _contR = _tgtC._ar != null ? _tgtC._ar : dr; _contC = _tgtC._ac != null ? _tgtC._ac : dc; _tgtC = C.getCell(db, _contR, _contC); }
+      if (_tgtC && !_tgtC._occ && hasTag(_tgtC, '容器') && _tgtC._uid && (!_dragItem._uid || _dragItem._uid !== _tgtC._uid) && !isItemInContainer(_tgtC._uid, _dragItem._uid)) {
+        _isContainer = true;
+        if (!C.exists(_tgtC._uid)) initContainerGrid(_tgtC);
+        var _cCont = C.get(_tgtC._uid);
+        var _is = _dragItem, _iw = _is.x || 1, _ih = _is.y || 1;
+        _space = findContainerSpace(_cCont, _iw, _ih);
+        if (!_space && _iw !== _ih) { _space = findContainerSpace(_cCont, _ih, _iw); _needRot = true; }
+        // 计算：ban（容器物品级别——背包级别的 ban 可能漏掉未装备的容器）
+        if (!_banned && _cCont && _cCont._banTags) {
+          for (var _bt2 = 0; _bt2 < _cCont._banTags.length; _bt2++) {
+            if (hasTag(_dragItem, _cCont._banTags[_bt2])) { _banned = true; break; }
+          }
+        }
+      }
+    }
+    // ===== 统一输出 =====
+    // l11 覆盖层（容器才显示）
+    if (_isContainer) {
+      var _l11All = document.querySelectorAll('[data-overlay-for="' + db + '-' + _contR + '-' + _contC + '"]');
+      var _l11Over = null;
+      for (var _li = 0; _li < _l11All.length; _li++) {
+        if (_l11All[_li].closest('.screen.active')) { _l11Over = _l11All[_li]; break; }
+      }
+      if (!_l11Over && _l11All.length) _l11Over = _l11All[0];
+      if (_l11Over) {
+        var _l11El = _l11Over.querySelector('.l12');
+        if (!_l11El) {
+          _l11El = document.createElement('div');
+          _l11El.className = 'l12';
+          _l11El.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:4;';
+          _l11Over.appendChild(_l11El);
+          _dragL11.push(_l11El);
+        }
+        _l11El.style.backgroundColor = (!_banned && _space) ? 'rgba(120,190,120,0.35)' : 'rgba(190,120,120,0.35)';
+        _l11El.style.display = '';
+      }
+    }
+    // 旋转
+    if (_isContainer && !_banned && _space && _needRot) {
+      _dragRotated = true;
+      _dragSize = {w: _dragOrigSize.h, h: _dragOrigSize.w};
+      if (_dragOrigGrabOffset) {
+        _dragGrabOffset = {dr: _dragOrigGrabOffset.dc, dc: (_dragOrigSize.h - 1) - _dragOrigGrabOffset.dr};
+      }
+      if (_dragOverlay) {
+        _dragOverlay.style.width = _dragSize.w * CELL_SIZE + 'px';
+        _dragOverlay.style.height = _dragSize.h * CELL_SIZE + 'px';
+        _dragOverlay.style.left = (_lastMX - _dragSize.w * HALF_CELL) + 'px';
+        _dragOverlay.style.top = (_lastMY - _dragSize.h * HALF_CELL) + 'px';
+        var _icon = _dragOverlay.firstChild;
+        _icon.style.transform = 'rotate(90deg)';
+      }
+    }
+    if (_isContainer) return;
+    // 判定区缓存：鼠标在中心 50×50 判定区内时不更新落点
+    var _snapped = null;
+    if (_lastSnapBag === db && _lastSnapRow >= 0) {
+      var _jc = el.parentNode.querySelector('[data-drop="bag"][data-bag="' + db + '"][data-row="' + _lastSnapRow + '"][data-col="' + _lastSnapCol + '"]');
+      if (_jc) {
+        var _jg = _jc.parentNode.getBoundingClientRect();
+        var _jcx = (_lastSnapCol + sz.w / 2) * CELL_SIZE;
+        var _jcy = (_lastSnapRow + sz.h / 2) * CELL_SIZE;
+        var _px = cx - _jg.left;
+        var _py = cy - _jg.top;
+        if (_px >= _jcx - 25 && _px < _jcx + 25 && _py >= _jcy - 25 && _py < _jcy + 25) {
+          _snapped = { row: _lastSnapRow, col: _lastSnapCol };
+        } else {
+          // 鼠标不在判定区内：向离开方向位移1格
+          var _gridW = bagData ? bagData.w : 0, _gridH = bagData ? bagData.h : 0;
+          var _shiftR = 0, _shiftC = 0;
+          if (_px < _jcx - 25 && _lastSnapCol > 0) _shiftC = -1;
+          else if (_px >= _jcx + 25 && _lastSnapCol + sz.w < _gridW) _shiftC = 1;
+          if (_py < _jcy - 25 && _lastSnapRow > 0) _shiftR = -1;
+          else if (_py >= _jcy + 25 && _lastSnapRow + sz.h < _gridH) _shiftR = 1;
+          if (_shiftR !== 0 || _shiftC !== 0) {
+            _snapped = { row: _lastSnapRow + _shiftR, col: _lastSnapCol + _shiftC };
+            _lastSnapBag = db; _lastSnapRow = _snapped.row; _lastSnapCol = _snapped.col;
+          }
+        }
+      }
+    }
+    if (!_snapped) {
+      var _itemR, _itemC;
+      if (sz.h % 2) { _itemR = dr - Math.floor(sz.h / 2); }
+      else { var _rc = el.getBoundingClientRect(); _itemR = (cy - _rc.top < _rc.height / 2) ? dr - 1 : dr; }
+      if (sz.w % 2) { _itemC = dc - Math.floor(sz.w / 2); }
+      else { var _rc = el.getBoundingClientRect(); _itemC = (cx - _rc.left < _rc.width / 2) ? dc - 1 : dc; }
+      _snapped = { row: _itemR, col: _itemC };
+      _lastSnapBag = db; _lastSnapRow = _itemR; _lastSnapCol = _itemC;
+      // 初始落点立即稳定：循环位移直到光标进入中心判定区
+      for (var _si = 0; _si < 10; _si++) {
+        var _jc2 = el.parentNode.querySelector('[data-drop="bag"][data-bag="' + db + '"][data-row="' + _lastSnapRow + '"][data-col="' + _lastSnapCol + '"]');
+        if (!_jc2) break;
+        var _jg2 = _jc2.parentNode.getBoundingClientRect();
+        var _jcx2 = (_lastSnapCol + sz.w / 2) * CELL_SIZE, _jcy2 = (_lastSnapRow + sz.h / 2) * CELL_SIZE;
+        var _px2 = cx - _jg2.left, _py2 = cy - _jg2.top;
+        if (_px2 >= _jcx2 - 25 && _px2 < _jcx2 + 25 && _py2 >= _jcy2 - 25 && _py2 < _jcy2 + 25) break;
+        var _gW2 = bagData ? bagData.w : 0, _gH2 = bagData ? bagData.h : 0;
+        var _sR = 0, _sC = 0;
+        if (_px2 < _jcx2 - 25 && _lastSnapCol > 0) _sC = -1;
+        else if (_px2 >= _jcx2 + 25 && _lastSnapCol + sz.w < _gW2) _sC = 1;
+        if (_py2 < _jcy2 - 25 && _lastSnapRow > 0) _sR = -1;
+        else if (_py2 >= _jcy2 + 25 && _lastSnapRow + sz.h < _gH2) _sR = 1;
+        if (_sR === 0 && _sC === 0) break;
+        _lastSnapRow += _sR; _lastSnapCol += _sC;
+        _snapped = { row: _lastSnapRow, col: _lastSnapCol };
+      }
+    }
+    // 每帧显示落点
+    var _canDropHere = !_banned && (!_isContainer || _space);
+    if (_canDropHere && _snapped) {
+      var _baseGroup = null;
+      for (var _ocr = 0; _ocr < sz.h && _canDropHere; _ocr++) {
+        for (var _occ = 0; _occ < sz.w && _canDropHere; _occ++) {
+          var _orow = _snapped.row + _ocr, _ocol = _snapped.col + _occ;
+          if (_dragSrc && _dragSrc.src === 'bag' && db === _dragSrc.bag &&
+              _orow >= _dragSrc.row && _orow < _dragSrc.row + _dragOrigSize.h &&
+              _ocol >= _dragSrc.col && _ocol < _dragSrc.col + _dragOrigSize.w) continue;
+          if (!isCellEmpty(db, _orow, _ocol)) { _canDropHere = false; break; }
+          var _g = getCellGroup(db, _orow, _ocol);
+          if (_g === null) { _canDropHere = false; break; }
+          if (_baseGroup === null) _baseGroup = _g;
+          else if (_g !== _baseGroup) { _canDropHere = false; break; }
+        }
+      }
+    }
+    if (_snapped) {
+      var _l13c = el.parentNode.querySelector('[data-drop="bag"][data-bag="' + db + '"][data-row="' + _snapped.row + '"][data-col="' + _snapped.col + '"]');
+      if (_l13c) {
+        var _l13g = _l13c.parentNode;
+        var _l13d = document.createElement('div');
+        _l13d.className = 'l13';
+        _l13d.style.cssText = 'position:absolute;left:' + (_snapped.col * CELL_SIZE) + 'px;top:' + (_snapped.row * CELL_SIZE) + 'px;width:' + (sz.w * CELL_SIZE) + 'px;height:' + (sz.h * CELL_SIZE) + 'px;pointer-events:none;background:' + (_canDropHere ? 'rgba(100,180,100,0.45)' : 'rgba(180,100,100,0.45)') + ';z-index:3;';
+        _l13g.appendChild(_l13d);
+        _dragL13.push(_l13d);
+      }
+    }
+    // 返回（容器/banned 不回落到后续处理）
+    if (_banned || _isContainer) return;
+  }
+}
+document.addEventListener('mousemove', function(e) {
+  _lastMX = e.clientX; _lastMY = e.clientY;
+  if (_dragPotential && !_isDragging && _dragStartTarget) {
+    if (Math.abs(e.clientX - _dragStartX) > 5 || Math.abs(e.clientY - _dragStartY) > 5) {
+      _startDrag(e, _dragStartTarget, _dragPotentialSrc);
+      _dragPotential = false;
+    }
+    return;
+  }
+  if (!_isDragging) return;
+  // 叠加层跟随鼠标（不节流，保持流畅）
+  if (_dragOverlay) { _dragOverlay.style.left = (e.clientX - _dragSize.w * HALF_CELL) + 'px'; _dragOverlay.style.top = (e.clientY - _dragSize.h * HALF_CELL) + 'px'; }
+});
+// 定时检测落点（每16ms），解决滚动等非鼠标移动时落点不更新的问题
+var _dropHLTimer = setInterval(function() {
+  if (_isDragging) {
+    _updateDropHL(_lastMX, _lastMY);
+  }
+}, 10);
+// mouseup：放下物品
+document.addEventListener('mouseup', function(e) {
+  if (_dragPotential) { _dragPotential = false; _dragStartTarget = null; _dragPotentialSrc = null; return; }
+  if (!_isDragging) return;
+  if (_dragOverlay) { _dragOverlay.style.display = 'none'; _dragOverlay = null; }
+  document.querySelectorAll('.drag-over, .drag-invalid, .drag-equip-valid').forEach(function(el) { el.classList.remove('drag-over', 'drag-invalid', 'drag-equip-valid'); });
+  var target = document.elementFromPoint(e.clientX, e.clientY);
+  if (!target) { _cancelDrag(); return; }
+  var el = target.closest('[data-drop]'); if (!el) { _cancelDrag(); return; }
+  var src = _dragSrc;
+  if (!src) { _cancelDrag(); return; }
+  var dstType = el.getAttribute('data-drop');
+  // === drop 逻辑 ===
+  if (src.src === 'merchant' && dstType === 'buybox') {
+    handleMerchantDrop(src.merchant, src.row, src.col);
+    _cancelDrag(); renderAll(); return;
+  }
+  if (dstType === 'bag') {
+    var _cDb = el.getAttribute('data-bag');
+    var _cDr = parseInt(el.getAttribute('data-row'));
+    var _cDc = parseInt(el.getAttribute('data-col'));
+    // 保险箱禁止放入背包/腰包/胸包（实际 drop 拦截）
+    if (src && (src.src === 'bag' || src.src === 'equipped' || src.src === 'weaponSlot' || src.src === 'sidearmSlot')) {
+      var _dropItem = resolveDragItem(src);
+      if (_dropItem && _dropItem.tags) {
+        var _cBagData = C.get(_cDb);
+        if (_cBagData && _cBagData._banTags) {
+          for (var _bi = 0; _bi < _cBagData._banTags.length; _bi++) {
+            if (hasTag(_dropItem, _cBagData._banTags[_bi])) { showCenterMsg('保险箱内不可放入此类型物品'); _cancelDrag(); renderAll(); return; }
+          }
+        }
+      }
+    }
+    var _cSrcItem = resolveDragItem(src);
+    if (_cSrcItem) {
+      var _cTg = C.getCell(_cDb, _cDr, _cDc);
+      if (_cTg && _cTg._occ) { var _cAr = _cTg._ar != null ? _cTg._ar : _cDr, _cAc = _cTg._ac != null ? _cTg._ac : _cDc; _cTg = C.getCell(_cDb, _cAr, _cAc); }
+      if (_cTg && !_cTg._occ && hasTag(_cTg, '容器') && _cTg._uid && (!_cSrcItem._uid || _cSrcItem._uid !== _cTg._uid)) {
+        if (isItemInContainer(_cTg._uid, _cSrcItem._uid)) { showCenterMsg('不可放入'); _cancelDrag(); renderAll(); return; }
+        if (!C.exists(_cTg._uid)) initContainerGrid(_cTg);
+        var _cCont = C.get(_cTg._uid);
+        // 保险箱容器禁止放入背包/腰包/胸包（auto-nest 路径）
+        if (_cCont && _cCont._banTags) {
+          var _cBanned = false;
+          for (var _cb = 0; _cb < _cCont._banTags.length; _cb++) {
+            if (hasTag(_cSrcItem, _cCont._banTags[_cb])) { _cBanned = true; break; }
+          }
+          if (_cBanned) { showCenterMsg('保险箱内不可放入此类型物品'); _cancelDrag(); renderAll(); return; }
+        }
+        var _cSz = _dragRotated ? _dragSize : getItemSize(_cSrcItem);
+        var _cSpace = findContainerSpace(_cCont, _cSz.w, _cSz.h);
+        if (_cSpace) {
+          if (src.src === 'bag') removeItem(src.bag, src.row, src.col);
+          else if (src.src === 'equipped') { C.delete(src.slot); E.clear(src.slot); if (src.slot === 'sling' && E.weapon) { E.weapon.forEach(function(w) { if (w) addToBag(w); }); E.clearWeapon(); } }
+          else if (src.src === 'weaponSlot') E.weapon[src.idx] = null;
+          else if (src.src === 'sidearmSlot') E.sidearm[src.idx] = null;
+          placeItemInCont(_cCont, _dragRotated ? applyDragRotation(_cSrcItem) : _cSrcItem, _cSpace.row, _cSpace.col);
+        } else { showCenterMsg('不可放入'); }
+        _cancelDrag(); renderAll(); return;
+      }
+    }
+  }
+  if (src.src === 'bag') {
+    if (dstType === 'bag') {
+      var db = el.getAttribute('data-bag');
+      if (db.indexOf('_cont_') === 0) {
+        var contUid = parseInt(db.substring(6), 10);
+        var srcItem = C.getCell(src.bag, src.row, src.col);
+        if (srcItem && (srcItem._uid === contUid || isItemInContainer(contUid, srcItem._uid))) { showCenterMsg('不可放入'); _cancelDrag(); return; }
+      }
+      var dr = parseInt(el.getAttribute('data-row'));
+      var dc = parseInt(el.getAttribute('data-col'));
+      var bagData = C.get(db);
+      if (bagData && bagData.connected === false && _dragOrigSize && (_dragOrigSize.w > 1 || _dragOrigSize.h > 1)) { _cancelDrag(); return; }
+      var dd = C.get(db); if (!dd || !dd.grid) { _cancelDrag(); return; }
+      var sd = C.get(src.bag); if (!sd || !sd.grid) { _cancelDrag(); return; }
+      var item = sd.grid[src.row][src.col]; if (!item) { _cancelDrag(); return; }
+      var _pSz = _dragRotated ? _dragSize : getItemSize(item);
+      var placeRow = _lastSnapRow >= 0 ? _lastSnapRow : dr - Math.floor(_pSz.h / 2);
+      var placeCol = _lastSnapCol >= 0 ? _lastSnapCol : dc - Math.floor(_pSz.w / 2);
+      if (!_dragRotated && db === src.bag && placeRow === src.row && placeCol === src.col) { _cancelDrag(); return; }
+      var sz = _pSz;
+      var canPlace = true, baseGroup = null;
+      for (var r = 0; r < sz.h && canPlace; r++) for (var c = 0; c < sz.w && canPlace; c++) {
+        var tr = placeRow + r, tc = placeCol + c;
+        var thisGroup = getCellGroup(db, tr, tc);
+        if (baseGroup === null) baseGroup = thisGroup;
+        if (thisGroup === null || thisGroup !== baseGroup) { canPlace = false; break; }
+        if (db === src.bag && tr >= src.row && tr < src.row + (_dragOrigSize ? _dragOrigSize.h : 0) && tc >= src.col && tc < src.col + (_dragOrigSize ? _dragOrigSize.w : 0)) continue;
+        if (!isCellEmpty(db, tr, tc)) {
+          if (!(item._qty != null && item.stack != null && sz.w === 1 && sz.h === 1)) { canPlace = false; }
+          else { var occItem = dd.grid[tr] && dd.grid[tr][tc]; if (!(occItem && !occItem._occ && occItem.id === item.id && occItem._qty != null && occItem._qty < occItem.stack)) canPlace = false; }
+        }
+      }
+      if (!canPlace) {
+        var snapOpts = (db === src.bag) ? {skipBag:src.bag, skipRow:src.row, skipCol:src.col, skipH:_dragOrigSize ? _dragOrigSize.h : 0, skipW:_dragOrigSize ? _dragOrigSize.w : 0} : null;
+        var snapped = findSnapPosition(db, dr, dc, sz, snapOpts);
+        if (!snapped) { _cancelDrag(); return; }
+        placeRow = snapped.row; placeCol = snapped.col;
+      }
+      if (item._qty != null && item.stack != null && sz.w === 1 && sz.h === 1) {
+        var tgt = dd.grid[placeRow] && dd.grid[placeRow][placeCol];
+        if (tgt && !tgt._occ && tgt.id === item.id && tgt._qty != null) {
+          var maxS = item.stack, space = maxS - tgt._qty;
+          if (space > 0) { var transfer = Math.min(space, item._qty); tgt._qty += transfer; item._qty -= transfer; if (item._qty <= 0) removeItem(src.bag, src.row, src.col); }
+          _cancelDrag(); renderAll(); return;
+        }
+      }
+      removeItem(src.bag, src.row, src.col);
+      placeItem(db, applyDragRotation(item), placeRow, placeCol);
+    } else if (dstType === 'equip') {
+      equipItem(src.bag, src.row, src.col);
+    } else if (dstType === 'bodypart') {
+      var bpItem = C.getCell(src.bag, src.row, src.col);
+      if (bpItem && hasTag(bpItem, '医用品')) {
+        var bpKey = el.getAttribute('data-bodypart');
+        var limb = G.limbs[bpKey];
+        if (limb && limb.hp < limb.max) {
+          var missing = limb.max - limb.hp, dur = bpItem.durability != null ? bpItem.durability : Infinity, consume = Math.min(dur, missing);
+          limb.hp += consume;
+          if (dur < Infinity) { bpItem.durability -= consume; if (bpItem.durability <= 0) removeItem(src.bag, src.row, src.col); }
+          _cancelDrag(); renderAll(); return;
+        }
+      }
+    }
+  } else if (src.src === 'equipped') {
+    if (dstType === 'bag') {
+      var targetBag = el.getAttribute('data-bag');
+      var item = applyDragRotation(E.get(src.slot));
+      if (!item) { _cancelDrag(); return; }
+      var bag = null;
+      if (targetBag.indexOf('_cont_') === 0 && item._uid) { var contUid = parseInt(targetBag.substring(6), 10); if (item._uid === contUid || isItemInContainer(contUid, item._uid)) { _cancelDrag(); return; } }
+      if (targetBag === C.STASH || targetBag.indexOf('_cont_') === 0) {
+        var dr = parseInt(el.getAttribute('data-row')); var dc = parseInt(el.getAttribute('data-col'));
+        var sz = getItemSize(item); canPlace = true; baseGroup = null;
+        var placeRow = dr - Math.floor(sz.h / 2); var placeCol = dc - Math.floor(sz.w / 2);
+        for (var r = 0; r < sz.h && canPlace; r++) for (var c = 0; c < sz.w && canPlace; c++) {
+          var tr = placeRow + r, tc = placeCol + c, thisGroup = getCellGroup(targetBag, tr, tc);
+          if (baseGroup === null) baseGroup = thisGroup;
+          if (thisGroup === null || thisGroup !== baseGroup) { canPlace = false; break; }
+          if (!isCellEmpty(targetBag, tr, tc)) canPlace = false;
+        }
+        if (!canPlace) { var snapped = findSnapPosition(targetBag, dr, dc, sz, null); if (snapped) { placeRow = snapped.row; placeCol = snapped.col; canPlace = true; } }
+        if (canPlace) { placeItem(targetBag, item, placeRow, placeCol); bag = targetBag; }
+      } else { bag = addToBag(item); }
+      if (bag) { C.delete(src.slot); E.clear(src.slot); if (src.slot === 'sling' && E.weapon) { E.weapon.forEach(function(w) { if (w) addToBag(w); }); E.clearWeapon(); } }
+    }
+  } else if (src.src === 'weaponSlot') {
+    if (dstType === 'bag') {
+      var targetBag = el.getAttribute('data-bag');
+      var item = applyDragRotation(E.weapon[src.idx]);
+      if (!item) { _cancelDrag(); return; }
+      if (targetBag.indexOf('_cont_') === 0 && item._uid) { var contUid = parseInt(targetBag.substring(6), 10); if (item._uid === contUid || isItemInContainer(contUid, item._uid)) { _cancelDrag(); return; } }
+      if (targetBag === C.STASH || targetBag.indexOf('_cont_') === 0) {
+        var dr = parseInt(el.getAttribute('data-row')); var dc = parseInt(el.getAttribute('data-col'));
+        var sz = getItemSize(item);
+        var placeRow = dr - Math.floor(sz.h / 2); var placeCol = dc - Math.floor(sz.w / 2); canPlace = true; baseGroup = null;
+        for (var r = 0; r < sz.h && canPlace; r++) for (var c = 0; c < sz.w && canPlace; c++) {
+          var tr = placeRow + r, tc = placeCol + c, thisGroup = getCellGroup(targetBag, tr, tc);
+          if (baseGroup === null) baseGroup = thisGroup;
+          if (thisGroup === null || thisGroup !== baseGroup) { canPlace = false; break; }
+          if (!isCellEmpty(targetBag, tr, tc)) canPlace = false;
+        }
+        if (!canPlace) { var snapped = findSnapPosition(targetBag, dr, dc, sz, null); if (snapped) { placeRow = snapped.row; placeCol = snapped.col; canPlace = true; } }
+        if (canPlace) { E.weapon[src.idx] = null; placeItem(targetBag, item, placeRow, placeCol); } else { _cancelDrag(); return; }
+      } else { E.weapon[src.idx] = null; addToBag(item); }
+    }
+  } else if (src.src === 'sidearmSlot') {
+    if (dstType === 'bag') {
+      var targetBag = el.getAttribute('data-bag');
+      var item = applyDragRotation(E.sidearm[src.idx]);
+      if (!item) { _cancelDrag(); return; }
+      if (targetBag.indexOf('_cont_') === 0 && item._uid) { var contUid = parseInt(targetBag.substring(6), 10); if (item._uid === contUid || isItemInContainer(contUid, item._uid)) { _cancelDrag(); return; } }
+      if (targetBag === C.STASH || targetBag.indexOf('_cont_') === 0) {
+        var dr = parseInt(el.getAttribute('data-row')); var dc = parseInt(el.getAttribute('data-col'));
+        var sz = getItemSize(item);
+        var placeRow = dr - Math.floor(sz.h / 2); var placeCol = dc - Math.floor(sz.w / 2); canPlace = true; baseGroup = null;
+        for (var r = 0; r < sz.h && canPlace; r++) for (var c = 0; c < sz.w && canPlace; c++) {
+          var tr = placeRow + r, tc = placeCol + c, thisGroup = getCellGroup(targetBag, tr, tc);
+          if (baseGroup === null) baseGroup = thisGroup;
+          if (thisGroup === null || thisGroup !== baseGroup) { canPlace = false; break; }
+          if (!isCellEmpty(targetBag, tr, tc)) canPlace = false;
+        }
+        if (!canPlace) { var snapped = findSnapPosition(targetBag, dr, dc, sz, null); if (snapped) { placeRow = snapped.row; placeCol = snapped.col; canPlace = true; } }
+        if (canPlace) { E.sidearm[src.idx] = null; placeItem(targetBag, item, placeRow, placeCol); } else { _cancelDrag(); return; }
+      } else { E.sidearm[src.idx] = null; addToBag(item); }
+    }
+  }
+  _cancelDrag(); renderAll();
+});
+
+// 右键 / R 键旋转（拖拽期间可用）
+document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+document.addEventListener('mousedown', function(e) {
+  if (e.button !== 2) return;
+  e.preventDefault();
+  if (_isDragging) return;
+  // 非拖拽：右键立即打开物品详情
+  document.querySelectorAll('.l10').forEach(function(l){l.style.display='none';}); _selectedEl = null;
+  var el = e.target.closest('[data-drag]'); if (!el) return;
+  var d = el.getAttribute('data-drag'); if (!d) return;
+  closeModal(); var src;
+  try { src = JSON.parse(d); } catch(ee) { return; }
+  if (src.src === 'bag') { var _ri = C.getCell(src.bag, src.row, src.col); if (_ri && hasTag(_ri, '储藏箱')) return; showGridItemModal(src.bag, src.row, src.col); }
+  else if (src.src === 'equipped') { var _ri = E.get(src.slot); if (_ri && hasTag(_ri, '储藏箱')) return; showEquipModal(src.slot); }
+  else if (src.src === 'weaponSlot') showWeaponSlotModal(src.idx);
+  else if (src.src === 'sidearmSlot') showSidearmSlotModal(src.idx);
+  else if (src.src === 'merchant') switchMerchant(src.merchant);
+});
+
+// R 键旋转
+document.addEventListener('keydown', function(e) {
+  if (!_isDragging) return;
+  if (e.code === 'KeyR' || e.key === 'r' || e.key === 'R') { _dragRotateWrapper(); e.preventDefault(); }
+});
+
+function _dragRotateWrapper() {
+  if (!_dragOrigSize) return;
+  dragRotate();
+  if (_dragOverlay) {
+    _dragOverlay.style.width = _dragSize.w * CELL_SIZE + 'px';
+    _dragOverlay.style.height = _dragSize.h * CELL_SIZE + 'px';
+    _dragOverlay.style.left = (_lastMX - _dragSize.w * HALF_CELL) + 'px';
+    _dragOverlay.style.top = (_lastMY - _dragSize.h * HALF_CELL) + 'px';
+    var _icon = _dragOverlay.firstChild;
+    _icon.style.transform = _dragRotated ? 'rotate(90deg)' : '';
+  }
+}
+
+function _cancelDrag() {
+  if (_dragOverlay) { _dragOverlay.style.display = 'none'; _dragOverlay = null; }
+  // 恢复原位物品显示
+  _dragSourceEls.forEach(function(s) { s.style.opacity = ''; s.style.visibility = ''; s.style.display = ''; if (s._origBgColor) { s.style.backgroundColor = s._origBgColor; delete s._origBgColor; } else { s.style.backgroundColor = ''; } if (s._origBg) { s.style.backgroundImage = s._origBg; delete s._origBg; } if (s._origOutline) { s.style.outline = s._origOutline; delete s._origOutline; } });
+  _dragSourceEls = [];
+  if (_dragL11 && _dragL11.length) { _dragL11.forEach(function(el) { if (el.parentNode) el.parentNode.removeChild(el); }); _dragL11 = []; }
+  _dragItem = null; _dragSrc = null; _dragSize = {w:1,h:1}; _dragHL = []; _dragRotated = false; _dragOrigSize = null; _dragGrabOffset = null; _dragOrigGrabOffset = null; _isDragging = false; _dragPotential = false; _dragStartTarget = null; _dragPotentialSrc = null;
+  document.querySelectorAll('.drag-over, .drag-invalid, .drag-equip-valid').forEach(function(el) { el.classList.remove('drag-over', 'drag-invalid', 'drag-equip-valid'); });
+  if (_dragL13 && _dragL13.length) {
+    _dragL13.forEach(function(el) { if (el.parentNode) el.parentNode.removeChild(el); }); _dragL13 = [];
+  }
+}
+
+// 左键单击选中，双击打开容器
+var _clickTimer = null, _clickSrc = null, _selectedEl = null;
+document.addEventListener('click', function(e) {
+    var el = e.target.closest('[data-drag]');
+  if (!el) {
+    document.querySelectorAll('.l10').forEach(function(l){l.style.display='none';});
+    _selectedEl = null;
+    if (_clickTimer) { clearTimeout(_clickTimer); _clickTimer = null; _clickSrc = null; }
+    return;
+  }
+  var d = el.getAttribute('data-drag');
+  if (!d) return;
+  var src;
+  try { src = JSON.parse(d); } catch(ee) { return; }
+  var item = resolveDragItem(src);
+  if (!item || item._occ) return;
+  // 阻止内联 onclick（右键已接管二级菜单）
+  e.stopPropagation();
+  e.preventDefault();
+  // 选中：用 overlay 选择器精准匹配
+  document.querySelectorAll('.l10').forEach(function(l){l.style.display='none';});
+  var overlay = null;
+  if (src.src === 'bag') {
+    var _active = document.querySelector('.screen.active');
+    if (_active) overlay = _active.querySelector('[data-overlay-for="' + src.bag + '-' + src.row + '-' + src.col + '"]');
+    if (!overlay) overlay = document.querySelector('[data-overlay-for="' + src.bag + '-' + src.row + '-' + src.col + '"]');
+  }
+  if(overlay){var s=overlay.querySelector('.l10');if(s)s.style.display='block';}
+  _selectedEl = overlay || el;
+  // 容器物品：双击检测打开
+  if (hasTag(item, '容器')) {
+    if (_clickTimer && _clickSrc) {
+      var same = false;
+      if (src.src === 'bag' && _clickSrc.src === 'bag') same = _clickSrc.bag === src.bag && _clickSrc.row === src.row && _clickSrc.col === src.col;
+      else if (src.src === 'equipped' && _clickSrc.src === 'equipped') same = _clickSrc.slot === src.slot;
+      else if (src.src === 'weaponSlot' && _clickSrc.src === 'weaponSlot') same = _clickSrc.idx === src.idx;
+      if (same) {
+        clearTimeout(_clickTimer); _clickTimer = null; _clickSrc = null;
+        closeModal();
+        if (src.src === 'bag') _sel = { row: src.row, col: src.col, source: src.bag };
+        else if (src.src === 'equipped') _sel = { slot: src.slot, source: 'equipped' };
+        else if (src.src === 'weaponSlot') _sel = { idx: src.idx, source: 'weaponSlot' };
+        itemOpen();
+        return;
+      }
+    }
+    if (_clickTimer) { clearTimeout(_clickTimer); _clickTimer = null; _clickSrc = null; }
+    _clickSrc = src;
+    _clickTimer = setTimeout(function() { _clickTimer = null; _clickSrc = null; }, 300);
+  }
+}, true);
+
+function applyDragRotation(item) {
+  if (_dragRotated && item) {
+    item = Object.assign({}, item);
+    var t = item.x;
+    item.x = item.y;
+    item.y = t;
+  }
+  return item;
+}
+
+// 当鼠标位置放不下多格物品时，搜索附近可放置的位置
+function findSnapPosition(db, dr, dc, sz, opts) {
+  // 按奇偶生成搜序：奇数从中心向外，偶数从左上角开始
+  function _order(n) {
+    var a = [];
+    if (n % 2) { var m = Math.floor(n / 2); a.push(m);
+      for (var i = 1; i <= m; i++) { a.push(m + i); a.push(m - i); }
+    } else { for (var i = 0; i < n; i++) a.push(i); }
+    return a;
+  }
+  var roffs = _order(sz.h), coffs = _order(sz.w);
+  for (var ri = 0; ri < roffs.length; ri++) {
+    for (var ci = 0; ci < coffs.length; ci++) {
+      var anchorR = dr - roffs[ri], anchorC = dc - coffs[ci];
+      var valid = true, baseGroup = null;
+      for (var r = 0; r < sz.h && valid; r++) {
+        for (var c = 0; c < sz.w && valid; c++) {
+          var tr = anchorR + r, tc = anchorC + c;
+          var thisGroup = getCellGroup(db, tr, tc);
+          if (baseGroup === null) baseGroup = thisGroup;
+          if (thisGroup === null || thisGroup !== baseGroup) { valid = false; break; }
+          if (opts && opts.skipBag === db &&
+              tr >= opts.skipRow && tr < opts.skipRow + opts.skipH &&
+              tc >= opts.skipCol && tc < opts.skipCol + opts.skipW) continue;
+          if (!isCellEmpty(db, tr, tc)) valid = false;
+        }
+      }
+      if (valid) return {row: anchorR, col: anchorC};
+    }
+  }
+    return null;
+}
+
+function handleMerchantDrop(merchantKey, row, col) {
+  var data = _merchantGrids[merchantKey];
+  if (!data || !data.grid) return;
+  var cell = data.grid[row][col];
+  if (!cell || !cell._template) return;
+  var tpl = cell._template;
+  var sz = getItemSize(tpl);
+  var space = findTradeSpace(_tradeBuyGrid, sz.w, sz.h);
+  if (!space) return;
+  for (var r = 0; r < sz.h; r++) for (var c = 0; c < sz.w; c++) _tradeBuyGrid[space.row+r][space.col+c] = { _occ: true, _ar: space.row, _ac: space.col };
+  _tradeBuyGrid[space.row][space.col] = Object.assign({}, tpl);
+}
+
+</script>
+</div>
+</div>
+</body>
+</html>
+
+<\/head>
