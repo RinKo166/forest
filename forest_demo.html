@@ -35,8 +35,11 @@ body {
   flex-direction: column;
 }
 .container {
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
+  overflow: hidden;
   background: #222;
   display: flex; flex-direction: column;
 }
@@ -608,12 +611,10 @@ function getCellSize() {
   return Math.max(s, 20);  // 最小 20px
 }
 function syncCellSize() {
-  var s = getCellSize();
-  if (s === CELL_SIZE) return;
-  CELL_SIZE = s;
-  HALF_CELL = s / 2;
-  document.documentElement.style.setProperty('--cell-size', s + 'px');
-  document.documentElement.style.setProperty('--scale', s / 50);
+  CELL_SIZE = getCellSize();
+  HALF_CELL = CELL_SIZE / 2;
+  document.documentElement.style.setProperty('--cell-size', CELL_SIZE + 'px');
+  document.documentElement.style.setProperty('--scale', CELL_SIZE / 50);
   renderAll();
 }
 
