@@ -14,6 +14,8 @@
 <style>
 :root {
   --cell-size: 50px;
+  --scale: 1;
+  --fs: calc(11px * var(--scale));
   --double-cell: calc(var(--cell-size) * 2);
   --container-cols: 11;
   --container-rows: 21;
@@ -28,7 +30,7 @@ html, body { margin:0; padding:0; height:100%; overflow:hidden; width:100vw; }
 body {
   background: #1a1a1a;
   color: #e0e0e0;
-  font-family: 'Segoe UI', sans-serif;
+  font-family: 'Segoe UI', sans-serif; font-size: var(--fs);
   display: flex;
   flex-direction: column;
 }
@@ -611,6 +613,7 @@ function syncCellSize() {
   CELL_SIZE = s;
   HALF_CELL = s / 2;
   document.documentElement.style.setProperty('--cell-size', s + 'px');
+  document.documentElement.style.setProperty('--scale', s / 50);
   renderAll();
 }
 
