@@ -2088,10 +2088,8 @@ document.addEventListener('mousemove', function(e) {
 });
 function positionModalAtCursor(box) {
   box.style.maxHeight = '80vh'; box.style.overflowY = 'auto';
-  void box.offsetHeight; // 强制重排，确保 getBoundingClientRect 准确
-  var _rect = box.getBoundingClientRect();
-  var _w = Math.min(_rect.width || 260, window.innerWidth - 20);
-  var _h = Math.min(_rect.height || 200, window.innerHeight - 20);
+  var _h = Math.min(box.scrollHeight || 300, window.innerHeight * 0.8);
+  var _w = Math.min(box.scrollWidth || 300, window.innerWidth - 20);
   var _mx = _lastMX + 15;
   var _my = _lastMY + 15;
   // 超出各边时：弹窗边贴视口边
