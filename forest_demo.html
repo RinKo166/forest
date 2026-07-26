@@ -3779,6 +3779,7 @@ document.addEventListener('mousedown', function(e) {
   if (e.button !== 2) return;
   e.preventDefault();
   if (_isDragging) return;
+  _lastMX = e.clientX; _lastMY = e.clientY; // 更新鼠标位置
   // 非拖拽：右键立即打开物品详情
   document.querySelectorAll('.l10').forEach(function(l){l.style.display='none';}); _selectedEl = null;
   var el = e.target.closest('[data-drag]'); if (!el) return;
