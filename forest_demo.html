@@ -598,11 +598,12 @@ function _getItemIconUrl(itemId) {
 // 网格尺寸常量（响应式）
 var CELL_SIZE = 50, HALF_CELL = 25;
 function getCellSize() {
-  var w = window.innerWidth;
-  if (w >= 1200) return 50;
-  if (w >= 768) return 40;
-  if (w >= 480) return 30;
-  return 25;
+  var mw = window.innerWidth, mh = window.innerHeight;
+  // 基于视口宽高计算合适的格子尺寸
+  var byW = Math.floor((mw - 40) / 28);     // 左右面板共约 28 倍格子宽 + 间距
+  var byH = Math.floor((mh - 80) / 22);     // 容器约 21-22 行 + 顶栏
+  var s = Math.min(byW, byH, 50);
+  return Math.max(s, 20);  // 最小 20px
 }
 function syncCellSize() {
   var s = getCellSize();
