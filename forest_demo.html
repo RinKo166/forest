@@ -2086,6 +2086,7 @@ document.addEventListener('mousemove', function(e) {
 });
 function positionModalAtCursor(box) {
   var w = Math.min(box.offsetWidth || 260, 400);
+  box.style.maxHeight = '90vh'; box.style.overflowY = 'auto';
   var h = Math.min(box.offsetHeight || 200, 300);
   var mx = Math.min(_lastMX + 15, window.innerWidth - w - 10);
   var my = Math.min(_lastMY + 15, window.innerHeight - h - 10);
