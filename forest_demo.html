@@ -2094,13 +2094,11 @@ function positionModalAtCursor(box) {
   var _h = Math.min(_rect.height || 200, window.innerHeight - 20);
   var _mx = _lastMX + 15;
   var _my = _lastMY + 15;
-  // 右边不够 → 靠左
-  if (_mx + _w > window.innerWidth) _mx = window.innerWidth - _w - 10;
-  // 下边不够 → 弹窗底边贴视口底边
+  // 超出各边时：弹窗边贴视口边
+  if (_mx + _w > window.innerWidth) _mx = window.innerWidth - _w;
   if (_my + _h > window.innerHeight) _my = window.innerHeight - _h;
-  // 贴底后上边超了 → 贴顶
-  if (_my < 10) _my = 10;
-  _mx = Math.max(_mx, 10);
+  if (_mx < 0) _mx = 0;
+  if (_my < 0) _my = 0;
   box.style.position = 'fixed';
   box.style.left = _mx + 'px';
   box.style.top = my + 'px';
