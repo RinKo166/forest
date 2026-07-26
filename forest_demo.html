@@ -2088,6 +2088,7 @@ document.addEventListener('mousemove', function(e) {
 });
 function positionModalAtCursor(box) {
   box.style.maxHeight = '80vh'; box.style.overflowY = 'auto';
+  void box.offsetHeight; // 强制重排，确保 getBoundingClientRect 准确
   var _rect = box.getBoundingClientRect();
   var _w = Math.min(_rect.width || 260, window.innerWidth - 20);
   var _h = Math.min(_rect.height || 200, window.innerHeight - 20);
@@ -2095,10 +2096,11 @@ function positionModalAtCursor(box) {
   var _my = _lastMY + 15;
   // 右边不够 → 靠左
   if (_mx + _w > window.innerWidth) _mx = window.innerWidth - _w - 10;
-  // 下边不够 → 靠上
-  if (_my + _h > window.innerHeight) _my = window.innerHeight - _h - 10;
+  // 下边不够 → 放到鼠标上方
+  if (_my + _h > window.innerHeight) _my = _lastMY - _h - 15;
+  // 上方也不够 → 贴顶
+  if (_my < 10) _my = 10;
   _mx = Math.max(_mx, 10);
-  _my = Math.max(_my, 10);
   box.style.position = 'fixed';
   box.style.left = _mx + 'px';
   box.style.top = my + 'px';
