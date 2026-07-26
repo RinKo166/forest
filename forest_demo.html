@@ -2096,9 +2096,9 @@ function positionModalAtCursor(box) {
   var _my = _lastMY + 15;
   // 右边不够 → 靠左
   if (_mx + _w > window.innerWidth) _mx = window.innerWidth - _w - 10;
-  // 下边不够 → 放到鼠标上方
-  if (_my + _h > window.innerHeight) _my = _lastMY - _h - 15;
-  // 上方也不够 → 贴顶
+  // 下边不够 → 弹窗底边贴视口底边
+  if (_my + _h > window.innerHeight) _my = window.innerHeight - _h;
+  // 贴底后上边超了 → 贴顶
   if (_my < 10) _my = 10;
   _mx = Math.max(_mx, 10);
   box.style.position = 'fixed';
