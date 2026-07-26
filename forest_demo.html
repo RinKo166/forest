@@ -2087,15 +2087,20 @@ document.addEventListener('mousemove', function(e) {
   _lastMY = e.clientY;
 });
 function positionModalAtCursor(box) {
-  var w = Math.min(box.offsetWidth || 260, 400);
-  box.style.maxHeight = '90vh'; box.style.overflowY = 'auto';
-  var h = Math.min(box.offsetHeight || 200, 300);
-  var mx = Math.min(_lastMX + 15, window.innerWidth - w - 10);
-  var my = Math.min(_lastMY + 15, window.innerHeight - h - 10);
-  mx = Math.max(mx, 10);
-  my = Math.max(my, 10);
+  box.style.maxHeight = '80vh'; box.style.overflowY = 'auto';
+  var _rect = box.getBoundingClientRect();
+  var _w = Math.min(_rect.width || 260, window.innerWidth - 20);
+  var _h = Math.min(_rect.height || 200, window.innerHeight - 20);
+  var _mx = _lastMX + 15;
+  var _my = _lastMY + 15;
+  // 右边不够 → 靠左
+  if (_mx + _w > window.innerWidth) _mx = window.innerWidth - _w - 10;
+  // 下边不够 → 靠上
+  if (_my + _h > window.innerHeight) _my = window.innerHeight - _h - 10;
+  _mx = Math.max(_mx, 10);
+  _my = Math.max(_my, 10);
   box.style.position = 'fixed';
-  box.style.left = mx + 'px';
+  box.style.left = _mx + 'px';
   box.style.top = my + 'px';
   box.style.margin = '0';
 }
@@ -3287,8 +3292,8 @@ function _startDrag(e, el, src) {
   _icon.style.transform = '';
   _div.style.width = _dragSize.w * CELL_SIZE + 'px';
   _div.style.height = _dragSize.h * CELL_SIZE + 'px';
-  _div.style.left = (e.clientX - _dragSize.w * HALF_CELL) + 'px';
-  _div.style.top = (e.clientY - _dragSize.h * HALF_CELL) + 'px';
+  _div.style.left = Math.min(e.clientX - _dragSize.w * HALF_CELL, window.innerWidth - _dragSize.w * CELL_SIZE) + 'px';
+  _div.style.top = Math.min(e.clientY - _dragSize.h * HALF_CELL, window.innerHeight - _dragSize.h * CELL_SIZE) + 'px';
   _div.style.display = 'flex';
   _div.style.alignItems = 'center';
   _div.style.justifyContent = 'center';
@@ -3466,8 +3471,8 @@ function _updateDropHL(cx, cy) {
       if (_dragOverlay) {
         _dragOverlay.style.width = _dragSize.w * CELL_SIZE + 'px';
         _dragOverlay.style.height = _dragSize.h * CELL_SIZE + 'px';
-        _dragOverlay.style.left = (_lastMX - _dragSize.w * HALF_CELL) + 'px';
-        _dragOverlay.style.top = (_lastMY - _dragSize.h * HALF_CELL) + 'px';
+        _dragOverlay.style.left = Math.min(_lastMX - _dragSize.w * HALF_CELL, window.innerWidth - _dragSize.w * CELL_SIZE) + 'px';
+        _dragOverlay.style.top = Math.min(_lastMY - _dragSize.h * HALF_CELL, window.innerHeight - _dragSize.h * CELL_SIZE) + 'px';
         var _icon = _dragOverlay.firstChild;
         _icon.style.transform = 'rotate(90deg)';
       }
@@ -3571,7 +3576,7 @@ document.addEventListener('mousemove', function(e) {
   }
   if (!_isDragging) return;
   // 叠加层跟随鼠标（不节流，保持流畅）
-  if (_dragOverlay) { _dragOverlay.style.left = (e.clientX - _dragSize.w * HALF_CELL) + 'px'; _dragOverlay.style.top = (e.clientY - _dragSize.h * HALF_CELL) + 'px'; }
+  if (_dragOverlay) { _dragOverlay.style.left = Math.min(e.clientX - _dragSize.w * HALF_CELL, window.innerWidth - _dragSize.w * CELL_SIZE) + 'px'; _dragOverlay.style.top = Math.min(e.clientY - _dragSize.h * HALF_CELL, window.innerHeight - _dragSize.h * CELL_SIZE) + 'px'; }
 });
 // 定时检测落点（每16ms），解决滚动等非鼠标移动时落点不更新的问题
 var _dropHLTimer = setInterval(function() {
@@ -3801,8 +3806,8 @@ function _dragRotateWrapper() {
   if (_dragOverlay) {
     _dragOverlay.style.width = _dragSize.w * CELL_SIZE + 'px';
     _dragOverlay.style.height = _dragSize.h * CELL_SIZE + 'px';
-    _dragOverlay.style.left = (_lastMX - _dragSize.w * HALF_CELL) + 'px';
-    _dragOverlay.style.top = (_lastMY - _dragSize.h * HALF_CELL) + 'px';
+    _dragOverlay.style.left = Math.min(_lastMX - _dragSize.w * HALF_CELL, window.innerWidth - _dragSize.w * CELL_SIZE) + 'px';
+    _dragOverlay.style.top = Math.min(_lastMY - _dragSize.h * HALF_CELL, window.innerHeight - _dragSize.h * CELL_SIZE) + 'px';
     var _icon = _dragOverlay.firstChild;
     _icon.style.transform = _dragRotated ? 'rotate(90deg)' : '';
   }
